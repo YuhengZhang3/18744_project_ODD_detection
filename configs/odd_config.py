@@ -3,7 +3,8 @@
 BACKBONE_NAME = "dinov2_vitl14"
 ADAPTER_DIM = 1024
 
-# labels可以按规则在dataloader里从json转成类别id
+# change num_classes or add new heads here.
+# for new global heads using cls feature, also add the name to _GLOBAL_HEADS in models/odd_model.py.
 
 ODD_HEAD_CONFIG = {
     "weather": {
