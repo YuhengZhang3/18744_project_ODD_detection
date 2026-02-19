@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
+.env
+.venv
+venv/
+.idea/
+.vscode/
+.DS_Store
+data/*.jsonl
+outputs/
+checkpoints/
