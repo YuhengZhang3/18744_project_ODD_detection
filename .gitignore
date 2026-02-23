@@ -1,3 +1,4 @@
+# python stuff
 __pycache__/
 *.pyc
 *.pyo
@@ -8,8 +9,13 @@ __pycache__/
 .venv
 venv/
 .idea/
+
+# meta files
 .vscode/
 .DS_Store
+
+# output data
 data/*.jsonl
 outputs/
 checkpoints/
+source_images/
