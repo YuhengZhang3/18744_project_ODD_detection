@@ -1,2 +1,2 @@
-output_json/
-output_images/
+*.json
+*.jpg
