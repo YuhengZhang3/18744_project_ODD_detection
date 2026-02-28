@@ -18,4 +18,5 @@ venv/
 data/*.jsonl
 outputs/
 checkpoints/
-source_images/
+source_images/checkpoints_time_scene/
+*.pt
