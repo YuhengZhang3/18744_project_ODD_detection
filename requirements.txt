@@ -7,3 +7,7 @@ torch
 torchvision
 opencv-python
 numpy
+
+# precipitation
+scikit-learn
+tqdm
