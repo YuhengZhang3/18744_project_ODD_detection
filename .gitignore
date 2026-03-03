@@ -20,3 +20,4 @@ outputs/
 checkpoints/
 source_images/checkpoints_time_scene/
 *.pt
+*.png
