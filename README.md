@@ -105,92 +105,57 @@ City street is well recognized. Highway is moderate. Residential is more ambiguo
 
 This stage gives us a solid baseline for time and scene heads. Next steps will add more ODD dimensions (e.g. visibility, road condition, weather) on top of the same DINOv2 backbone.
 
-## Visibility (BDD100K)
+## Visibility labeling on BDD100K
 
-Goal: derive a visibility score (good / medium / poor) as one ODD dimension, using BDD100K 100k images and labels.
+Goal: build a 3-level visibility label (`vis ∈ {0,1,2}` = poor / medium / good) as one ODD dimension.
 
-### Label source
+### Source labels
 
 Use BDD100K attributes:
 
-- `weather`: clear, rainy, foggy, snowy, ...
-- `timeofday`: dawn/dusk, daytime, night, ...
+- `weather` (clear, rainy, foggy, snowy, overcast, …)
+- `timeofday` (dawn/dusk, daytime, night, undefined)
 
-Groups in analysis:
-
-- `clear_day`   = clear + daytime  
-- `clear_night` = clear + night  
-- `rainy`       = rainy (any time)  
-- `foggy`       = foggy (any time)  
-- `snowy`       = snowy (any time)  
+For analysis, images are grouped as: clear_day, clear_night, rainy, foggy, snowy.
 
 ### CV features
 
-For each image, compute simple CV features:
+For each image, simple, dataset-agnostic features:
 
-Global:
+- global grayscale contrast, global edge density
+- near-road ROI (lower-middle): contrast
+- far-road ROI (mid-height): contrast
+- sky/top region: contrast
+- basic blur / haze scores (Laplacian variance, dark-channel style score)
 
-- global edge density (Canny, whole image)
-- global contrast (std of grayscale)
+No network training is used here; only low-level image statistics.
 
-Region-based:
+### Current rule
 
-- near-road ROI (lower-middle): contrast + edge density  
-- far-road ROI  (mid-height, middle): contrast + edge density  
-- sky/top region (top 1/3): contrast  
+Visibility label:
 
-Blur and haze:
+- `vis = 2` (good)  
+  - mainly daytime / dawn / dusk  
+  - near-road and far-road contrast above thresholds
 
-- Laplacian variance on global / near / far regions (sharp vs blurred)  
-- simple dark-channel haze score (mean of min RGB channel)
+- `vis = 1` (medium)  
+  - mainly night scenes  
+  - near-road contrast high, far-road and sky contrast low
 
-Segmentation-based (SegFormer, Cityscapes):
+- `vis = 0` (poor)  
+  - foggy scenes, or  
+  - both near-road and far-road contrast very low
 
-- road contrast: std of gray values on road mask  
-- road edge density: Canny edges inside road mask  
-- road depth: vertical extent of road mask / image height
+Implementation:
 
-### Observations
+- `scripts/label_visibility_bdd.py`  
+  - read BDD100K images + JSON  
+  - write extra JSON files to `datasets/visibility_labels/{train,val,test}` with:
+    - `visibility`, `weather`, `timeofday`, `near_contrast`, `far_contrast`
 
-From sampled images (val split):
+- `scripts/vis_visibility_from_labels.py`  
+  - sample images per visibility level from val split  
+  - save grid `vis_visibility_samples_val.png` for manual sanity check
 
-- `clear_day`, `rainy`, `snowy`
-  - high global contrast
-  - high near and far contrast
-  - sky contrast also high
-  - road contrast and road depth reasonably high  
-  → visibility is generally **good**.
-
-- `clear_night`
-  - lowest global contrast (image mostly dark)
-  - near-road contrast is still high (lane markings and headlights visible)
-  - far and sky contrast are low
-  - road contrast is moderate, road depth is normal  
-  → near the ego car is readable, far range is dark → visibility **medium**.
-
-- `foggy`
-  - global contrast slightly lower
-  - **near-road contrast is the lowest among all groups**
-  - far contrast is also low
-  - road contrast is low, sometimes road depth is shorter
-  → both near and far regions are washed out → visibility **poor**.
-
-Dynamic range is close to 1.0 for all groups (dark + bright regions in each image), so this feature is not very useful.
-
-### Planned visibility rule (pseudo)
-
-Define a discrete visibility label `vis ∈ {0, 1, 2}`:
-
-- `vis = 2 (good)`
-  - weather in {clear, rainy, snowy}, and
-  - near-road and far-road contrast above simple thresholds.
-
-- `vis = 1 (medium)`
-  - clear night (clear + night) with:
-    - near-road contrast high,
-    - far/sky contrast low.
-
-- `vis = 0 (poor)`
-  - foggy scenes, or
-  - near-road contrast below a low threshold, combined with low far-road contrast
-    and low road contrast.
+Rough manual check on samples shows about 80–85% agreement with human judgment.  
+Thresholds are currently tuned on BDD100K and can be re-calibrated (e.g., via quantiles or a small classifier) for other datasets.
