@@ -26,6 +26,8 @@ def visualize_metrics(image_dir="output_boxes", json_dir="output_json"):
             idx += 1
             continue
 
+        # --- Scale to 720p ---
+        img = cv2.resize(img, (1280, 720), interpolation=cv2.INTER_LINEAR)
         h, w = img.shape[:2]
         display_img = img.copy()
 
@@ -35,7 +37,10 @@ def visualize_metrics(image_dir="output_boxes", json_dir="output_json"):
         p90_score_text = "N/A"
         sky_mean_text = "N/A"
         sky_p90_text = "N/A"
+        glare_text = "N/A"
+        
         cf_val = 0.0
+        severe_glare = False
         
         if os.path.exists(json_path):
             try:
@@ -50,6 +55,12 @@ def visualize_metrics(image_dir="output_boxes", json_dir="output_json"):
                     condition_text = str(data.get("lighting_condition", "unknown")).upper()
                     p90_score_text = str(data.get("light_level_p90", "N/A"))
                     
+                    # Glare metrics
+                    glare_data = data.get("glare", {})
+                    severe_glare = glare_data.get("has_severe_glare", False)
+                    glare_ratio = glare_data.get("glare_ratio", 0.0)
+                    glare_text = f"{glare_ratio * 100:.1f}%"
+
                     # Debug metrics
                     debug = data.get("debug_metrics", {})
                     sky_mean_text = str(debug.get("sky_mean", "N/A"))
@@ -57,17 +68,17 @@ def visualize_metrics(image_dir="output_boxes", json_dir="output_json"):
             except Exception as e:
                 condition_text = "JSON ERROR"
 
-        # --- UI Overlay (Scaled for 480x270) ---
+        # --- UI Overlay (Scaled for 1280x720) ---
         
-        # Compact header
-        header_height = 55
+        # Header
+        header_height = 80
         overlay = display_img.copy()
         cv2.rectangle(overlay, (0, 0), (w, header_height), (20, 20, 20), -1)
         cv2.addWeighted(overlay, 0.85, display_img, 0.15, 0, display_img)
 
         # 1. Draw Title
         title_text = f"FILE: {filename}"
-        cv2.putText(display_img, title_text, (5, 12), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 200), 1)
+        cv2.putText(display_img, title_text, (20, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
         
         # 2. Draw Lighting Condition (Color Coded)
         cond_color = (255, 255, 255) # White default
@@ -76,24 +87,28 @@ def visualize_metrics(image_dir="output_boxes", json_dir="output_json"):
         elif condition_text == "NIGHT": cond_color = (255, 100, 100)   
         elif "UNKNOWN" in condition_text: cond_color = (100, 100, 100) 
         
-        cv2.putText(display_img, f"COND: {condition_text}", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, cond_color, 1)
-        cv2.putText(display_img, f"P90: {p90_score_text}", (5, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 200), 1)
+        cv2.putText(display_img, f"COND: {condition_text}", (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, cond_color, 2)
+        cv2.putText(display_img, f"P90: {p90_score_text}", (230, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
 
-        # 3. Draw Cloud Cover (Shifted left for smaller width)
+        # 3. Draw Cloud Cover
         cloud_color = (255, 255, 255) if cf_val > 0.3 else (255, 200, 50)
-        cv2.putText(display_img, f"CLOUD: {cloud_text}", (140, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, cloud_color, 1)
+        cv2.putText(display_img, f"CLOUD: {cloud_text}", (420, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, cloud_color, 2)
 
-        # 4. Draw Debug Metrics (Shifted to fit within ~480px bounds)
-        cv2.putText(display_img, f"MEAN: {sky_mean_text}", (w - 110, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (150, 255, 150), 1)
-        cv2.putText(display_img, f"SKY P90: {sky_p90_text}", (w - 110, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (150, 150, 150), 1)
+        # 4. Draw Glare Metrics
+        glare_color = (0, 0, 255) if severe_glare else (150, 255, 150) # Red if dangerous, Green if safe
+        cv2.putText(display_img, f"GLARE: {glare_text}", (640, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, glare_color, 2)
 
-        # Compact solid black footer for controls
-        cv2.rectangle(display_img, (0, h - 20), (w, h), (10, 10, 10), -1)
+        # 5. Draw Debug Metrics
+        cv2.putText(display_img, f"MEAN: {sky_mean_text}", (w - 250, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 255, 150), 1)
+        cv2.putText(display_img, f"SKY P90: {sky_p90_text}", (w - 250, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 1)
+
+        # Footer for controls
+        cv2.rectangle(display_img, (0, h - 35), (w, h), (10, 10, 10), -1)
         footer_text = f"[{idx+1}/{len(image_paths)}] Controls: [N] Next | [B] Back | [Q] Quit"
-        cv2.putText(display_img, footer_text, (5, h - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 255), 1)
+        cv2.putText(display_img, footer_text, (20, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
         # --- Display ---
-        cv2.imshow("Multi-Metric Visualizer", display_img)
+        cv2.imshow("Multi-Metric Visualizer - 720p", display_img)
         
         # --- Keyboard Navigation ---
         key = cv2.waitKey(0) & 0xFF
