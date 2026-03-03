@@ -57,9 +57,22 @@ def assign_visibility(weather, tod, near_c, far_c):
     return 2
 
 
+def resolve_split_dir(root, base, split):
+    # base is "100k_datasets" or "100k_label"
+    # support both:
+    #   root/base/split
+    #   root/base/100k/split
+    cand1 = os.path.join(root, base, split)
+    cand2 = os.path.join(root, base, "100k", split)
+    for c in (cand1, cand2):
+        if os.path.isdir(c):
+            return c
+    raise RuntimeError(f"no dir found for {base}/{split} under {root}")
+
+
 def process_split(data_root, split):
-    img_dir = os.path.join(data_root, "100k_datasets", split)
-    label_dir = os.path.join(data_root, "100k_label", split)
+    img_dir = resolve_split_dir(data_root, "100k_datasets", split)
+    label_dir = resolve_split_dir(data_root, "100k_label", split)
 
     out_dir = os.path.join(data_root, "visibility_labels", split)
     os.makedirs(out_dir, exist_ok=True)
@@ -67,7 +80,7 @@ def process_split(data_root, split):
     files = [f for f in os.listdir(label_dir) if f.endswith(".json")]
     files.sort()
 
-    print(f"split {split}, num labels {len(files)}")
+    print(f"split {split}, img_dir={img_dir}, label_dir={label_dir}, num labels {len(files)}")
 
     for fname in tqdm(files):
         jpath = os.path.join(label_dir, fname)

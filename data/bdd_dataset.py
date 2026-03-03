@@ -125,13 +125,20 @@ def collate_time_scene(batch):
         "severity": out_sev,
     }
 
+def resolve_img_root_for_split(root, split):
+    cand1 = os.path.join(root, "100k_datasets", split)
+    cand2 = os.path.join(root, "100k_datasets", "100k", split)
+    for c in (cand1, cand2):
+        if os.path.isdir(c):
+            return c
+    raise RuntimeError(f"no img dir for split {split} under {root}")
 
 class BDDDVisibility(Dataset):
     # visibility labels from *_vis.json
 
     def __init__(self, split, transform=None):
         self.bdd_root = get_bdd_root()
-        self.img_root = os.path.join(self.bdd_root, "100k_datasets", split)
+        self.img_root = resolve_img_root_for_split(self.bdd_root, split)
         self.vis_root = os.path.join(self.bdd_root, "visibility_labels", split)
 
         if transform is None:
