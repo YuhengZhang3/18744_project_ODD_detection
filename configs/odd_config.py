@@ -53,15 +53,18 @@ ADAPTER_DIM = 1024
 ODD_HEAD_CONFIG = {
     "time": {
         "type": "multiclass",
-        # dawn/dusk, daytime, night, undefined
         "num_classes": 4,
         "loss_weight": 1.0,
     },
     "scene": {
         "type": "multiclass",
-        # city street, gas station, highway, parking lot,
-        # residential, tunnel, undefined
         "num_classes": 7,
+        "loss_weight": 1.0,
+    },
+    "visibility": {
+        "type": "multiclass",
+        # 0 = poor, 1 = medium, 2 = good
+        "num_classes": 3,
         "loss_weight": 1.0,
     },
 }

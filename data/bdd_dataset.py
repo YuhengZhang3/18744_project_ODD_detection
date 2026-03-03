@@ -39,6 +39,18 @@ def get_default_transform():
     )
 
 
+def get_bdd_root():
+    # try server first, then local mac
+    candidates = [
+        "/home/yuhengz3@andrew.cmu.edu/bdd100k",
+        "/Users/zhangyuheng/Documents/Study/CMU_Courses/2026Spring/18744/Project/datasets",
+    ]
+    for p in candidates:
+        if os.path.isdir(p):
+            return p
+    raise RuntimeError("bdd root not found, update get_bdd_root()")
+
+
 class BDDDTimeScene(Dataset):
     # bdd100k time + scene from per-image json files
 
@@ -112,3 +124,44 @@ def collate_time_scene(batch):
         "mask": out_mask,
         "severity": out_sev,
     }
+
+
+class BDDDVisibility(Dataset):
+    # visibility labels from *_vis.json
+
+    def __init__(self, split, transform=None):
+        self.bdd_root = get_bdd_root()
+        self.img_root = os.path.join(self.bdd_root, "100k_datasets", split)
+        self.vis_root = os.path.join(self.bdd_root, "visibility_labels", split)
+
+        if transform is None:
+            self.transform = get_default_transform()
+        else:
+            self.transform = transform
+
+        self.items = []
+        files = sorted(glob(os.path.join(self.vis_root, "*_vis.json")))
+        for jpath in files:
+            with open(jpath, "r") as f:
+                info = json.load(f)
+            name = info.get("name", None)
+            vis = info.get("visibility", None)
+            if name is None or vis is None:
+                continue
+            img_path = os.path.join(self.img_root, name)
+            if not os.path.exists(img_path):
+                continue
+            self.items.append((img_path, int(vis)))
+
+        print(f"visibility {split}: {len(self.items)} samples")
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, idx):
+        img_path, vis = self.items[idx]
+        img = Image.open(img_path).convert("RGB")
+        img = self.transform(img)
+
+        label = torch.tensor(vis, dtype=torch.long)
+        return img, label

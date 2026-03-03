@@ -6,8 +6,9 @@ from .heads import SimpleHead, AttentiveHead
 
 
 # cls heads: mostly global conditions
-#_GLOBAL_HEADS = {"weather", "lighting", "time", "traffic", "road_condition", "scene"}
-_GLOBAL_HEADS = {"time", "scene"}
+# _GLOBAL_HEADS = {"weather", "lighting", "time", "traffic", "road_condition", "scene"}
+_GLOBAL_HEADS = {"time", "scene", "visibility"}
+
 
 class ODDModel(nn.Module):
     # dinov2 backbone + multi-head classifier

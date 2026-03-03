@@ -5,6 +5,19 @@ import numpy as np
 from tqdm import tqdm
 
 
+def get_data_root():
+    candidates = [
+        "/home/yuhengz3@andrew.cmu.edu/bdd100k",
+        "/Users/zhangyuheng/Documents/Study/CMU_Courses/2026Spring/18744/Project/datasets",
+    ]
+    for p in candidates:
+        if os.path.isdir(p):
+            return p
+    raise RuntimeError(
+        "data_root not found. Please update candidates in get_data_root()."
+    )
+
+
 def get_near_far_contrast(img_bgr):
     img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     h, w = img_gray.shape
@@ -28,7 +41,6 @@ def get_near_far_contrast(img_bgr):
 
 def assign_visibility(weather, tod, near_c, far_c):
     # 2 = good, 1 = medium, 0 = poor
-    # thresholds from v3 stats, can tweak later
     fog_near_thr = 0.135
     fog_far_thr = 0.17
     night_far_thr = 0.19
@@ -93,14 +105,15 @@ def process_split(data_root, split):
             "far_contrast": far_c,
         }
 
-        opath = os.path.join(out_dir, os.path.splitext(fname)[0] + "_vis.json")
+        out_name = os.path.splitext(fname)[0] + "_vis.json"
+        opath = os.path.join(out_dir, out_name)
         with open(opath, "w") as f:
             json.dump(out, f)
 
 
 def main():
-    data_root = "/Users/zhangyuheng/Documents/Study/CMU_Courses/2026Spring/18744/Project/datasets"
-
+    data_root = get_data_root()
+    print("using data_root:", data_root)
     for split in ["train", "val", "test"]:
         process_split(data_root, split)
 
