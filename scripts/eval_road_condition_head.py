@@ -5,7 +5,7 @@ import sys
 from collections import defaultdict
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 root_dir = os.path.dirname(os.path.dirname(__file__))
 if root_dir not in sys.path:
@@ -15,11 +15,21 @@ from data.rscd_dataset import RSCDRoadCondition, RSCD_CLASSES
 from models.odd_model import ODDModel
 
 
-def eval_road_condition(data_root, ckpt_path, batch_size=128):
+def eval_road_condition(data_root, ckpt_path, batch_size=128, max_samples=20000):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device:", device)
 
-    ds = RSCDRoadCondition(root=data_root, split="train")
+    full_ds = RSCDRoadCondition(root=data_root, split="train")
+    n = len(full_ds)
+
+    if max_samples is not None and max_samples < n:
+        idx = torch.randperm(n)[:max_samples].tolist()
+        ds = Subset(full_ds, idx)
+        print("use subset:", len(ds), "from", n)
+    else:
+        ds = full_ds
+        print("use full dataset:", n)
+
     loader = DataLoader(
         ds,
         batch_size=batch_size,
@@ -27,7 +37,7 @@ def eval_road_condition(data_root, ckpt_path, batch_size=128):
         num_workers=8,
         pin_memory=True,
     )
-    print("dataset size:", len(ds), "batches:", len(loader))
+    print("batches:", len(loader))
 
     model = ODDModel(freeze_backbone=True).to(device)
     ckpt = torch.load(ckpt_path, map_location=device)
@@ -77,4 +87,5 @@ if __name__ == "__main__":
         data_root=data_root,
         ckpt_path=ckpt_path,
         batch_size=128,
+        max_samples=20000,
     )
