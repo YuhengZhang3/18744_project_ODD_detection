@@ -11,7 +11,7 @@ root_dir = os.path.dirname(os.path.dirname(__file__))
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-from data.rscd_dataset import RSCDRoadConditionSimple, RSCD_CLASSES
+from data.rscd_dataset import RSCDRoadCondition, RSCD_CLASSES
 from models.odd_model import ODDModel
 
 
@@ -19,7 +19,7 @@ def eval_road_condition(data_root, ckpt_path, batch_size=128):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device:", device)
 
-    ds = RSCDRoadConditionSimple(root=data_root, split="train")
+    ds = RSCDRoadCondition(root=data_root, split="train")
     loader = DataLoader(
         ds,
         batch_size=batch_size,
