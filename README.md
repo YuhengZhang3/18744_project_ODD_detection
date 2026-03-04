@@ -159,3 +159,20 @@ Implementation:
 
 Rough manual check on samples shows about 80–85% agreement with human judgment.  
 Thresholds are currently tuned on BDD100K and can be re-calibrated (e.g., via quantiles or a small classifier) for other datasets.
+
+### Visibility head
+
+- Use BDD100K image-level labels (`weather`, `timeofday`) and simple CV rules
+  (near/far contrast in gray image) to build a 3-class visibility label:
+  - 0 = poor, 1 = medium, 2 = good.
+- Labels are stored as JSON under `visibility_labels/{train,val,test}/*_vis.json`.
+- Train a separate head `visibility` on top of frozen DINOv2 features
+  using `scripts/train_visibility_head.py`.
+
+Current validation results on BDD100K val:
+
+- overall acc: **87.9%**
+- per class:
+  - poor: 80.4% (2245 samples)
+  - medium: 68.2% (1153 samples)
+  - good: 94.0% (6602 samples)
