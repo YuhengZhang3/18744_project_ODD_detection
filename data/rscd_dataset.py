@@ -56,8 +56,13 @@ def get_default_transform():
     )
 
 
+def _normalize_label_name(name: str) -> str:
+    # convert "dry-asphalt-smooth" to "dry_asphalt_smooth"
+    return name.replace("-", "_")
+
+
 class RSCDRoadCondition(Dataset):
-    # root: /home/xxx/rscd/dataset
+    # root example: /home/.../rscd/dataset
 
     def __init__(self, root: str, split: str = "train", transform=None):
         assert split in {"train", "test"}
@@ -90,8 +95,14 @@ class RSCDRoadCondition(Dataset):
                     if not os.path.isfile(txt_path):
                         continue
                     with open(txt_path, "r") as f:
-                        label_name = f.read().strip()
+                        line = f.read().strip()
+                    if not line:
+                        continue
+                    # txt example: "dry-asphalt-smooth dry-asphalt-smooth ..."
+                    first_token = line.split()[0]
+                    label_name = _normalize_label_name(first_token)
                     if label_name not in RSCD_CLASS_TO_ID:
+                        # unknown label, skip
                         continue
                     label_id = RSCD_CLASS_TO_ID[label_name]
                     self.samples.append((img_path, label_id))

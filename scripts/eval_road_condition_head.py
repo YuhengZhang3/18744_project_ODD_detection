@@ -19,16 +19,16 @@ def eval_road_condition(data_root, ckpt_path, batch_size=128, max_samples=20000)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device:", device)
 
-    full_ds = RSCDRoadCondition(root=data_root, split="train")
+    full_ds = RSCDRoadCondition(root=data_root, split="test")
     n = len(full_ds)
 
     if max_samples is not None and max_samples < n:
         idx = torch.randperm(n)[:max_samples].tolist()
         ds = Subset(full_ds, idx)
-        print("use subset:", len(ds), "from", n)
+        print("use subset:", len(ds), "from", n, "(test set)")
     else:
         ds = full_ds
-        print("use full dataset:", n)
+        print("use full test set:", n)
 
     loader = DataLoader(
         ds,
@@ -56,7 +56,7 @@ def eval_road_condition(data_root, ckpt_path, batch_size=128, max_samples=20000)
             imgs = imgs.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
-            cls_feat, patch_feat = model.backbone(imgs)
+            cls_feat, _ = model.backbone(imgs)
             logits = model.heads["road_condition"](cls_feat)
             preds = logits.argmax(dim=1)
 
@@ -69,9 +69,9 @@ def eval_road_condition(data_root, ckpt_path, batch_size=128, max_samples=20000)
                     correct_per[g] += 1
 
     overall = correct / max(total, 1)
-    print("overall road_condition acc:", overall)
+    print("overall road_condition acc (test):", overall)
 
-    print("\nper-class acc:")
+    print("\nper-class acc (test):")
     for idx, name in enumerate(RSCD_CLASSES):
         tot = total_per[idx]
         cor = correct_per[idx]

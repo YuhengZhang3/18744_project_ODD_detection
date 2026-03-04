@@ -17,9 +17,11 @@ from models.odd_model import ODDModel
 
 
 def freeze_backbone_and_other_heads(model):
+    # freeze backbone
     for p in model.backbone.parameters():
         p.requires_grad = False
 
+    # freeze all heads except road_condition
     for name, head in model.heads.items():
         if name == "road_condition":
             continue
@@ -44,7 +46,7 @@ def eval_road_condition(model, loader, device):
             imgs = imgs.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
-            cls_feat, patch_feat = model.backbone(imgs)
+            cls_feat, _ = model.backbone(imgs)
             logits = model.heads["road_condition"](cls_feat)
             preds = logits.argmax(dim=1)
 
@@ -113,8 +115,9 @@ def main():
             imgs = imgs.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
+            # backbone forward no grad
             with torch.no_grad():
-                cls_feat, patch_feat = model.backbone(imgs)
+                cls_feat, _ = model.backbone(imgs)
 
             logits = model.heads["road_condition"](cls_feat)
             loss = crit(logits, labels)
