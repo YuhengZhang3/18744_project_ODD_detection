@@ -10,18 +10,16 @@ if root_dir not in sys.path:
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 
-from data.rscd_dataset import RSCDRoadConditionSimple
+from data.rscd_dataset import RSCDRoadCondition
 from models.odd_model import ODDModel
 
 
 def freeze_backbone_and_other_heads(model):
-    # freeze backbone
     for p in model.backbone.parameters():
         p.requires_grad = False
 
-    # freeze all heads except road_condition
     for name, head in model.heads.items():
         if name == "road_condition":
             continue
@@ -46,7 +44,6 @@ def eval_road_condition(model, loader, device):
             imgs = imgs.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
-            # 只用 backbone + road_condition head
             cls_feat, patch_feat = model.backbone(imgs)
             logits = model.heads["road_condition"](cls_feat)
             preds = logits.argmax(dim=1)
@@ -61,19 +58,17 @@ def eval_road_condition(model, loader, device):
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # 和 time/scene/visibility 一致的超参数
     batch_size = 64
     num_epochs = 15
     lr = 3e-4
 
     data_root = "/home/yuhengz3@andrew.cmu.edu/rscd/dataset"
 
-    train_set = RSCDRoadConditionSimple(root=data_root, split="train")
-    # 简单起见，train-set 随机划 10% 做 val
-    n = len(train_set)
+    full_set = RSCDRoadCondition(root=data_root, split="train")
+    n = len(full_set)
     val_len = max(1, int(0.1 * n))
     train_len = n - val_len
-    train_set, val_set = torch.utils.data.random_split(train_set, [train_len, val_len])
+    train_set, val_set = random_split(full_set, [train_len, val_len])
 
     train_loader = DataLoader(
         train_set,
@@ -118,7 +113,6 @@ def main():
             imgs = imgs.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
-            # backbone 冻结，所以特征不用梯度
             with torch.no_grad():
                 cls_feat, patch_feat = model.backbone(imgs)
 

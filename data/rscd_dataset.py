@@ -10,7 +10,6 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 
-# class names from train-set folder names
 RSCD_CLASSES: List[str] = [
     "dry_asphalt_smooth",
     "dry_asphalt_slight",
@@ -45,7 +44,6 @@ RSCD_CLASS_TO_ID = {name: i for i, name in enumerate(RSCD_CLASSES)}
 
 
 def get_default_transform():
-    # same style as BDD: resize to 336 and normalize
     return transforms.Compose(
         [
             transforms.Resize((336, 336)),
@@ -59,31 +57,27 @@ def get_default_transform():
 
 
 class RSCDRoadCondition(Dataset):
-    # RSCD train/test as road_condition head
+    # root: /home/xxx/rscd/dataset
 
     def __init__(self, root: str, split: str = "train", transform=None):
-        # root should be ~/rscd/dataset
         assert split in {"train", "test"}
-        self.split = split
         self.transform = transform if transform is not None else get_default_transform()
+        self.samples: List[Tuple[str, int]] = []
 
         if split == "train":
             base_dir = os.path.join(root, "train-set")
-            self.samples: List[Tuple[str, int]] = []
             for cls_name in RSCD_CLASSES:
                 cls_dir = os.path.join(base_dir, cls_name)
                 if not os.path.isdir(cls_dir):
                     continue
                 for fname in os.listdir(cls_dir):
-                    fpath = os.path.join(cls_dir, fname)
                     if not fname.lower().endswith((".jpg", ".jpeg", ".png")):
                         continue
+                    img_path = os.path.join(cls_dir, fname)
                     label_id = RSCD_CLASS_TO_ID[cls_name]
-                    self.samples.append((fpath, label_id))
+                    self.samples.append((img_path, label_id))
         else:
             base_dir = os.path.join(root, "test-set")
-            self.samples = []
-            # test-set has subfolders 1..12, each with jpg+txt
             for seq_name in sorted(os.listdir(base_dir)):
                 seq_dir = os.path.join(base_dir, seq_name)
                 if not os.path.isdir(seq_dir):
@@ -102,44 +96,12 @@ class RSCDRoadCondition(Dataset):
                     label_id = RSCD_CLASS_TO_ID[label_name]
                     self.samples.append((img_path, label_id))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.samples)
 
     def __getitem__(self, idx: int):
         img_path, label_id = self.samples[idx]
         img = Image.open(img_path).convert("RGB")
         img = self.transform(img)
-
         label = torch.tensor(label_id, dtype=torch.long)
-
-        labels = {"road_condition": label}
-        mask = {"road_condition": torch.tensor(1.0, dtype=torch.float32)}
-        severity = {"road_condition": torch.tensor(1.0, dtype=torch.float32)}
-
-        return {
-            "image": img,
-            "labels": labels,
-            "mask": mask,
-            "severity": severity,
-        }
-
-
-def collate_rscd(batch):
-    imgs = torch.stack([b["image"] for b in batch], dim=0)
-
-    out_labels = {}
-    out_mask = {}
-    out_sev = {}
-
-    keys = batch[0]["labels"].keys()
-    for k in keys:
-        out_labels[k] = torch.stack([b["labels"][k] for b in batch], dim=0)
-        out_mask[k] = torch.stack([b["mask"][k] for b in batch], dim=0)
-        out_sev[k] = torch.stack([b["severity"][k] for b in batch], dim=0)
-
-    return {
-        "images": imgs,
-        "labels": out_labels,
-        "mask": out_mask,
-        "severity": out_sev,
-    }
+        return img, label

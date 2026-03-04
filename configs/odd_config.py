@@ -50,17 +50,15 @@ ADAPTER_DIM = 1024
 #         "loss_weight": 1.0,
 #     },
 # }
+
 ODD_HEAD_CONFIG = {
     "time": {
         "type": "multiclass",
-        # dawn/dusk, daytime, night, undefined
         "num_classes": 4,
         "loss_weight": 1.0,
     },
     "scene": {
         "type": "multiclass",
-        # city street, gas station, highway, parking lot,
-        # residential, tunnel, undefined
         "num_classes": 7,
         "loss_weight": 1.0,
     },
@@ -72,7 +70,7 @@ ODD_HEAD_CONFIG = {
     },
     "road_condition": {
         "type": "multiclass",
-        # 27 classes from RSCD
+        # 27 classes in RSCD
         "num_classes": 27,
         "loss_weight": 1.0,
     },
