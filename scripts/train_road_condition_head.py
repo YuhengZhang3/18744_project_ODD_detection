@@ -3,6 +3,7 @@
 import os
 import sys
 import time
+import argparse
 
 root_dir = os.path.dirname(os.path.dirname(__file__))
 if root_dir not in sys.path:
@@ -57,7 +58,30 @@ def eval_road_condition(model, loader, device):
     return acc
 
 
+def load_checkpoint(path, model, opt, sched, device):
+    ckpt = torch.load(path, map_location=device)
+    model.load_state_dict(ckpt["model"])
+    if opt is not None and "optimizer" in ckpt:
+        opt.load_state_dict(ckpt["optimizer"])
+    if sched is not None and "scheduler" in ckpt:
+        sched.load_state_dict(ckpt["scheduler"])
+    start_epoch = ckpt.get("epoch", 0) + 1
+    best_acc = ckpt.get("best_acc", ckpt.get("val_acc", 0.0))
+    print(f"resume from {path}, start_epoch={start_epoch}, best_acc={best_acc:.4f}")
+    return start_epoch, best_acc
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--resume_path",
+        type=str,
+        default=None,
+        help="checkpoint path to resume from, default checkpoints_road_condition_rscd/last.pt",
+    )
+    args = parser.parse_args()
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     batch_size = 64
@@ -70,6 +94,8 @@ def main():
     n = len(full_set)
     val_len = max(1, int(0.1 * n))
     train_len = n - val_len
+
+    # split train and val
     train_set, val_set = random_split(full_set, [train_len, val_len])
 
     train_loader = DataLoader(
@@ -99,13 +125,27 @@ def main():
 
     ckpt_dir = "checkpoints_road_condition_rscd"
     os.makedirs(ckpt_dir, exist_ok=True)
+
+    start_epoch = 1
     best_acc = 0.0
+
+    if args.resume:
+        if args.resume_path is None:
+            resume_path = os.path.join(ckpt_dir, "last.pt")
+        else:
+            resume_path = args.resume_path
+        if os.path.isfile(resume_path):
+            start_epoch, best_acc = load_checkpoint(
+                resume_path, model, opt, sched, device
+            )
+        else:
+            print(f"resume path {resume_path} not found, start from scratch")
 
     print("device:", device)
     print("batch_size:", batch_size, "epochs:", num_epochs)
-    print("train_len:", train_len, "val_len:", val_len)
+    print("start_epoch:", start_epoch, "best_acc:", best_acc)
 
-    for epoch in range(1, num_epochs + 1):
+    for epoch in range(start_epoch, num_epochs + 1):
         model.train()
         t0 = time.time()
         running_loss = 0.0
@@ -115,7 +155,6 @@ def main():
             imgs = imgs.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
-            # backbone forward no grad
             with torch.no_grad():
                 cls_feat, _ = model.backbone(imgs)
 
@@ -158,6 +197,7 @@ def main():
             "optimizer": opt.state_dict(),
             "scheduler": sched.state_dict(),
             "val_acc": val_acc,
+            "best_acc": best_acc,
         }
 
         last_path = os.path.join(ckpt_dir, "last.pt")
