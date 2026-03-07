@@ -3,17 +3,17 @@ import cv2
 import glob
 import torch
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 from transformers import SegformerForSemanticSegmentation
 from torch.optim import AdamW
 from tqdm import tqdm
 
-# --- 1. Custom Dataset Loader ---
+# --- 1. Custom Dataset Loader (Unchanged) ---
 class GlareDataset(Dataset):
     def __init__(self, root_dir="glaredetection/RGB", img_size=(512, 512)):
         self.img_paths = sorted(glob.glob(os.path.join(root_dir, "try_*", "images", "*.jpg")))
         self.img_size = img_size
-        print(f"Loaded {len(self.img_paths)} image-mask pairs for training.")
+        print(f"Found {len(self.img_paths)} total image-mask pairs.")
 
     def __len__(self):
         return len(self.img_paths)
@@ -51,12 +51,22 @@ def train_model():
     print(f"Training on {str(device).upper()}...")
 
     # Load Dataset
-    dataset = GlareDataset()
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=2)
+    full_dataset = GlareDataset()
+    
+    # --- ADDED: Train/Validation Split (80% / 20%) ---
+    train_size = int(0.8 * len(full_dataset))
+    val_size = len(full_dataset) - train_size
+    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    
+    print(f"Split dataset: {train_size} training images, {val_size} validation images.")
+
+    # Create distinct DataLoaders
+    train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=4, shuffle=False, num_workers=2) # Don't need to shuffle validation data
 
     # Load a pre-trained tiny SegFormer (b0) and change the head to 2 classes
     model = SegformerForSemanticSegmentation.from_pretrained(
-        "nvidia/mit-b0", # The tiny, lightning-fast base model
+        "nvidia/mit-b0", 
         num_labels=2, 
         ignore_mismatched_sizes=True
     ).to(device)
@@ -65,21 +75,19 @@ def train_model():
     optimizer = AdamW(model.parameters(), lr=0.0001)
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    epochs = 15
+    epochs = 30
     
     for epoch in range(epochs):
+        # --- TRAINING PHASE ---
         model.train()
-        total_loss = 0.0
+        total_train_loss = 0.0
         
-        # Progress bar
-        loop = tqdm(dataloader, leave=True)
+        loop = tqdm(train_loader, leave=False, desc=f"Epoch [{epoch+1}/{epochs}] Train")
         for images, masks in loop:
             images, masks = images.to(device), masks.to(device)
 
-            # Forward pass
             outputs = model(images)
             
-            # SegFormer outputs logits at 1/4 size, we must interpolate up to 512x512 to match our mask
             logits = torch.nn.functional.interpolate(
                 outputs.logits, 
                 size=masks.shape[-2:], 
@@ -87,19 +95,42 @@ def train_model():
                 align_corners=False
             )
             
-            # Calculate Cross Entropy Loss
             loss = loss_fn(logits, masks)
             
-            # Backpropagation
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            total_loss += loss.item()
-            loop.set_description(f"Epoch [{epoch+1}/{epochs}]")
+            total_train_loss += loss.item()
             loop.set_postfix(loss=loss.item())
 
-        print(f"Epoch {epoch+1} Average Loss: {total_loss/len(dataloader):.4f}")
+        avg_train_loss = total_train_loss / len(train_loader)
+
+        # --- VALIDATION PHASE ---
+        model.eval() # Freeze layers like Dropout/BatchNorm
+        total_val_loss = 0.0
+        
+        # Disable gradient calculation to save memory and compute
+        with torch.no_grad():
+            for images, masks in val_loader:
+                images, masks = images.to(device), masks.to(device)
+                
+                outputs = model(images)
+                
+                logits = torch.nn.functional.interpolate(
+                    outputs.logits, 
+                    size=masks.shape[-2:], 
+                    mode="bilinear", 
+                    align_corners=False
+                )
+                
+                loss = loss_fn(logits, masks)
+                total_val_loss += loss.item()
+
+        avg_val_loss = total_val_loss / len(val_loader)
+        
+        # Print epoch summary
+        print(f"Epoch {epoch+1:02d}/{epochs} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
 
     # Save the custom trained weights
     os.makedirs("custom_glare_model", exist_ok=True)
