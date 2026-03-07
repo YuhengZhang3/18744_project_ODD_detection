@@ -1,200 +1,177 @@
 import os
 import sys
 import argparse
-from time import time
 
 root_dir = os.path.dirname(os.path.dirname(__file__))
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
 import torch
-from torch.utils.data import DataLoader
 
 from data.bdd_dataset import BDDDTimeScene, collate_time_scene
 from models.odd_model import ODDModel
 from losses.odd_losses import odd_loss
+from utils.common import seed_everything, get_device, ensure_dir
+from utils.single_head_utils import (
+    make_loader,
+    freeze_vit_only,
+    move_batch_to_device,
+    save_last_and_best,
+)
 
 
-def make_loader(img_root, label_dir, batch_size, shuffle):
-    ds = BDDDTimeScene(img_root=img_root, label_dir=label_dir)
-    loader = DataLoader(
-        ds,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=8,
-        collate_fn=collate_time_scene,
-        pin_memory=True,
-    )
-    return loader, len(ds)
-
-
-def eval_one_epoch(model, loader, device):
+def eval_time_scene(model, loader, device):
     model.eval()
-    n = 0
+
+    total_time = 0
     correct_time = 0
+    total_scene = 0
     correct_scene = 0
 
     with torch.no_grad():
         for batch in loader:
-            imgs = batch["images"].to(device)
+            batch = move_batch_to_device(batch, device)
 
-            for k in batch["labels"]:
-                batch["labels"][k] = batch["labels"][k].to(device)
-                batch["mask"][k] = batch["mask"][k].to(device)
-                batch["severity"][k] = batch["severity"][k].to(device)
+            out = model(batch["images"])
 
-            out = model(imgs)
+            gt_time = batch["labels"]["time"]
+            gt_scene = batch["labels"]["scene"]
 
-            preds_time = out["time"].argmax(dim=1)
-            preds_scene = out["scene"].argmax(dim=1)
+            pred_time = out["time"].argmax(dim=1)
+            pred_scene = out["scene"].argmax(dim=1)
 
-            correct_time += (preds_time == batch["labels"]["time"]).sum().item()
-            correct_scene += (preds_scene == batch["labels"]["scene"]).sum().item()
-            n += imgs.size(0)
+            total_time += gt_time.numel()
+            correct_time += (pred_time == gt_time).sum().item()
 
-    acc_time = correct_time / max(n, 1)
-    acc_scene = correct_scene / max(n, 1)
-    return acc_time, acc_scene
+            total_scene += gt_scene.numel()
+            correct_scene += (pred_scene == gt_scene).sum().item()
 
-
-def save_checkpoint(state, ckpt_dir, name):
-    os.makedirs(ckpt_dir, exist_ok=True)
-    path = os.path.join(ckpt_dir, name)
-    torch.save(state, path)
-    return path
-
-
-def load_checkpoint(path, model, opt, sched, device):
-    ckpt = torch.load(path, map_location=device)
-    model.load_state_dict(ckpt["model"])
-    if opt is not None and "optimizer" in ckpt:
-        opt.load_state_dict(ckpt["optimizer"])
-    if sched is not None and "scheduler" in ckpt:
-        sched.load_state_dict(ckpt["scheduler"])
-    start_epoch = ckpt.get("epoch", 0) + 1
-    best_metric = ckpt.get("best_metric", 0.0)
-    return start_epoch, best_metric
+    return (
+        correct_time / max(total_time, 1),
+        correct_scene / max(total_scene, 1),
+    )
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--resume_path", type=str, default=None)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--epochs", type=int, default=15)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--weight_decay", type=float, default=0.05)
+    parser.add_argument("--num_workers", type=int, default=4)
+
+    parser.add_argument(
+        "--bdd_root",
+        type=str,
+        default="/home/yuhengz3@andrew.cmu.edu/bdd100k",
+    )
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        default="checkpoints_time_scene",
+    )
     args = parser.parse_args()
 
-    train_img_root = "/home/yuhengz3@andrew.cmu.edu/bdd100k/100k_datasets/100k/train"
-    train_label_dir = "/home/yuhengz3@andrew.cmu.edu/bdd100k/100k_label/100k/train"
+    seed_everything(args.seed)
+    device = get_device()
+    ensure_dir(args.save_dir)
 
-    val_img_root = "/home/yuhengz3@andrew.cmu.edu/bdd100k/100k_datasets/100k/val"
-    val_label_dir = "/home/yuhengz3@andrew.cmu.edu/bdd100k/100k_label/100k/val"
+    train_set = BDDDTimeScene(
+        img_root=os.path.join(args.bdd_root, "100k_datasets", "100k", "train"),
+        label_dir=os.path.join(args.bdd_root, "100k_label", "100k", "train"),
+    )
+    val_set = BDDDTimeScene(
+        img_root=os.path.join(args.bdd_root, "100k_datasets", "100k", "val"),
+        label_dir=os.path.join(args.bdd_root, "100k_label", "100k", "val"),
+    )
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    train_loader = make_loader(
+        train_set,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.num_workers,
+        collate_fn=collate_time_scene,
+    )
+    val_loader = make_loader(
+        val_set,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        collate_fn=collate_time_scene,
+    )
 
-    batch_size = 64
-    num_epochs = 15
-    lr = 3e-4
+    model = ODDModel(freeze_backbone=False).to(device)
 
-    train_loader, train_len = make_loader(train_img_root, train_label_dir, batch_size, shuffle=True)
-    val_loader, val_len = make_loader(val_img_root, val_label_dir, batch_size, shuffle=False)
+    # keep old behavior:
+    # freeze vit, but adapter remains trainable
+    freeze_vit_only(model)
 
-    model = ODDModel(freeze_backbone=True).to(device)
-
-    opt = torch.optim.AdamW(
+    optimizer = torch.optim.AdamW(
         model.parameters(),
-        lr=lr,
-        weight_decay=0.05,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
     )
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(
-        opt,
-        T_max=num_epochs,
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=args.epochs,
     )
 
-    ckpt_dir = "checkpoints_time_scene"
-    start_epoch = 0
-    best_metric = 0.0
-
-    if args.resume:
-        if args.resume_path is None:
-            resume_path = os.path.join(ckpt_dir, "last.pt")
-        else:
-            resume_path = args.resume_path
-        if os.path.isfile(resume_path):
-            start_epoch, best_metric = load_checkpoint(
-                resume_path, model, opt, sched, device
-            )
-            print("resume from", resume_path, "epoch", start_epoch, "best_metric", best_metric)
-        else:
-            print("resume flag set but file not found:", resume_path)
+    best_score = -1.0
 
     print("device:", device)
-    print("train size:", train_len, "val size:", val_len)
-    print("batch_size:", batch_size, "epochs:", num_epochs)
+    print("train size:", len(train_set))
+    print("val size:", len(val_set))
 
-    for epoch in range(start_epoch, num_epochs):
+    for epoch in range(1, args.epochs + 1):
         model.train()
-        t0 = time()
         running_loss = 0.0
-        steps = 0
 
         for batch in train_loader:
-            imgs = batch["images"].to(device)
+            batch = move_batch_to_device(batch, device)
 
-            for k in batch["labels"]:
-                batch["labels"][k] = batch["labels"][k].to(device)
-                batch["mask"][k] = batch["mask"][k].to(device)
-                batch["severity"][k] = batch["severity"][k].to(device)
-
-            out = model(imgs)
+            out = model(batch["images"])
             loss = odd_loss(out, batch)
 
-            opt.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            opt.step()
+            optimizer.step()
 
             running_loss += float(loss.detach())
-            steps += 1
 
-            if steps % 50 == 0:
-                dt = time() - t0
-                avg_loss = running_loss / steps
-                print(
-                    f"epoch {epoch+1}/{num_epochs} "
-                    f"step {steps} "
-                    f"loss {avg_loss:.4f} "
-                    f"({dt:.1f}s)"
-                )
-                t0 = time()
+        scheduler.step()
 
-        sched.step()
-
-        acc_time, acc_scene = eval_one_epoch(model, val_loader, device)
-        avg_loss = running_loss / max(steps, 1)
-        metric = 0.5 * (acc_time + acc_scene)
+        train_loss = running_loss / max(len(train_loader), 1)
+        val_time_acc, val_scene_acc = eval_time_scene(model, val_loader, device)
+        score = 0.5 * val_time_acc + 0.5 * val_scene_acc
 
         print(
-            f"[epoch {epoch+1}/{num_epochs}] "
-            f"train_loss {avg_loss:.4f} "
-            f"time_acc {acc_time:.3f} "
-            f"scene_acc {acc_scene:.3f} "
-            f"metric {metric:.3f} "
-            f"lr {sched.get_last_lr()[0]:.6f}"
+            f"[epoch {epoch}/{args.epochs}] "
+            f"train_loss {train_loss:.4f} "
+            f"time_acc {val_time_acc:.4f} "
+            f"scene_acc {val_scene_acc:.4f} "
+            f"score {score:.4f}"
         )
 
         state = {
             "epoch": epoch,
             "model": model.state_dict(),
-            "optimizer": opt.state_dict(),
-            "scheduler": sched.state_dict(),
-            "best_metric": best_metric,
+            "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(),
+            "time_acc": val_time_acc,
+            "scene_acc": val_scene_acc,
+            "score": score,
+            "args": vars(args),
         }
 
-        last_path = save_checkpoint(state, ckpt_dir, "last.pt")
-        print("saved last to", last_path)
-
-        if metric > best_metric:
-            best_metric = metric
-            best_path = save_checkpoint(state, ckpt_dir, "best.pt")
-            print("saved best to", best_path)
+        best_score, is_best = save_last_and_best(
+            state=state,
+            save_dir=args.save_dir,
+            score=score,
+            best_score=best_score,
+        )
+        if is_best:
+            print("saved best to", os.path.join(args.save_dir, "best.pt"))
 
 
 if __name__ == "__main__":

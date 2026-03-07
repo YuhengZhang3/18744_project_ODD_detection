@@ -1,8 +1,6 @@
 import os
 import sys
 import time
-import math
-import random
 import argparse
 
 root_dir = os.path.dirname(os.path.dirname(__file__))
@@ -10,181 +8,27 @@ if root_dir not in sys.path:
     sys.path.append(root_dir)
 
 import torch
-from torch.utils.data import DataLoader, random_split
 
-from data.bdd_dataset import (
-    BDDDTimeScene,
-    BDDDVisibility,
-    collate_time_scene,
-)
-from data.rscd_dataset import RSCDRoadCondition
 from models.odd_model import ODDModel
 from losses.odd_losses import odd_loss
-
-
-def seed_everything(seed=42):
-    random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-
-def collate_visibility(batch):
-    imgs = torch.stack([x[0] for x in batch], dim=0)
-    labels = torch.stack([x[1] for x in batch], dim=0)
-    bsz = labels.shape[0]
-    return {
-        "images": imgs,
-        "labels": {
-            "visibility": labels,
-        },
-        "mask": {
-            "visibility": torch.ones(bsz, dtype=torch.float32),
-        },
-        "severity": {
-            "visibility": torch.ones(bsz, dtype=torch.float32),
-        },
-    }
-
-
-def collate_road_condition(batch):
-    imgs = torch.stack([x[0] for x in batch], dim=0)
-    labels = torch.stack([x[1] for x in batch], dim=0)
-    bsz = labels.shape[0]
-    return {
-        "images": imgs,
-        "labels": {
-            "road_condition": labels,
-        },
-        "mask": {
-            "road_condition": torch.ones(bsz, dtype=torch.float32),
-        },
-        "severity": {
-            "road_condition": torch.ones(bsz, dtype=torch.float32),
-        },
-    }
-
-
-def move_batch_to_device(batch, device):
-    batch["images"] = batch["images"].to(device, non_blocking=True)
-    for group in ["labels", "mask", "severity"]:
-        for k in batch[group]:
-            batch[group][k] = batch[group][k].to(device, non_blocking=True)
-    return batch
-
-
-ALL_HEADS = ["time", "scene", "visibility", "road_condition"]
-
-
-def fill_missing_heads(batch):
-    device = batch["images"].device
-    bsz = batch["images"].shape[0]
-
-    for name in ALL_HEADS:
-        if name not in batch["labels"]:
-            batch["labels"][name] = torch.zeros(bsz, dtype=torch.long, device=device)
-        if name not in batch["mask"]:
-            batch["mask"][name] = torch.zeros(bsz, dtype=torch.float32, device=device)
-        if name not in batch["severity"]:
-            batch["severity"][name] = torch.ones(bsz, dtype=torch.float32, device=device)
-
-    return batch
-
-
-def freeze_backbone_stage1(model):
-    for p in model.backbone.parameters():
-        p.requires_grad = False
-
-    params = []
-    for _, head in model.heads.items():
-        for p in head.parameters():
-            p.requires_grad = True
-            params.append(p)
-    return params
-
-
-def eval_time_scene(model, loader, device):
-    model.eval()
-    total_time = 0
-    correct_time = 0
-    total_scene = 0
-    correct_scene = 0
-
-    with torch.no_grad():
-        for batch in loader:
-            imgs = batch["images"].to(device, non_blocking=True)
-            out = model(imgs)
-
-            y_time = batch["labels"]["time"].to(device, non_blocking=True)
-            y_scene = batch["labels"]["scene"].to(device, non_blocking=True)
-
-            p_time = out["time"].argmax(dim=1)
-            p_scene = out["scene"].argmax(dim=1)
-
-            total_time += y_time.numel()
-            correct_time += (p_time == y_time).sum().item()
-            total_scene += y_scene.numel()
-            correct_scene += (p_scene == y_scene).sum().item()
-
-    return (
-        correct_time / max(total_time, 1),
-        correct_scene / max(total_scene, 1),
-    )
-
-
-def eval_visibility(model, loader, device):
-    model.eval()
-    total = 0
-    correct = 0
-
-    with torch.no_grad():
-        for batch in loader:
-            imgs = batch["images"].to(device, non_blocking=True)
-            out = model(imgs)
-
-            y = batch["labels"]["visibility"].to(device, non_blocking=True)
-            p = out["visibility"].argmax(dim=1)
-
-            total += y.numel()
-            correct += (p == y).sum().item()
-
-    return correct / max(total, 1)
-
-
-def eval_road_condition(model, loader, device):
-    model.eval()
-    total = 0
-    correct = 0
-
-    with torch.no_grad():
-        for batch in loader:
-            imgs = batch["images"].to(device, non_blocking=True)
-            out = model(imgs)
-
-            y = batch["labels"]["road_condition"].to(device, non_blocking=True)
-            p = out["road_condition"].argmax(dim=1)
-
-            total += y.numel()
-            correct += (p == y).sum().item()
-
-    return correct / max(total, 1)
-
-
-def make_loader(dataset, batch_size, shuffle, num_workers, collate_fn=None):
-    return DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        pin_memory=True,
-        collate_fn=collate_fn,
-        drop_last=False,
-    )
-
-
-def cycle_loader(loader):
-    while True:
-        for batch in loader:
-            yield batch
+from utils.common import seed_everything, get_device, ensure_dir
+from utils.multitask_data import (
+    build_multitask_datasets,
+    build_multitask_loaders,
+    cycle_loader,
+    move_batch_to_device,
+    fill_missing_heads,
+)
+from utils.multitask_train import (
+    load_model_ckpt,
+    freeze_backbone_stage1,
+    eval_time_scene,
+    eval_visibility,
+    eval_road_condition,
+    compute_stage1_steps_per_epoch,
+    build_pattern,
+    maybe_save_best,
+)
 
 
 def main():
@@ -222,57 +66,24 @@ def main():
     args = parser.parse_args()
 
     seed_everything(args.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    os.makedirs(args.save_dir, exist_ok=True)
+    device = get_device()
+    ensure_dir(args.save_dir)
 
-    # bdd time/scene
-    ts_train = BDDDTimeScene(
-        img_root=os.path.join(args.bdd_root, "100k_datasets", "100k", "train"),
-        label_dir=os.path.join(args.bdd_root, "100k_label", "100k", "train"),
+    datasets = build_multitask_datasets(
+        bdd_root=args.bdd_root,
+        rscd_root=args.rscd_root,
+        seed=args.seed,
+        road_val_ratio=0.1,
     )
-    ts_val = BDDDTimeScene(
-        img_root=os.path.join(args.bdd_root, "100k_datasets", "100k", "val"),
-        label_dir=os.path.join(args.bdd_root, "100k_label", "100k", "val"),
-    )
-
-    # bdd visibility
-    vis_train = BDDDVisibility(split="train")
-    vis_val = BDDDVisibility(split="val")
-
-    # rscd road condition
-    road_full = RSCDRoadCondition(root=args.rscd_root, split="train")
-    n = len(road_full)
-    val_len = max(1, int(0.1 * n))
-    train_len = n - val_len
-    gen = torch.Generator().manual_seed(args.seed)
-    road_train, road_val = random_split(road_full, [train_len, val_len], generator=gen)
-
-    train_loader_ts = make_loader(
-        ts_train, args.batch_size, True, args.num_workers, collate_time_scene
-    )
-    val_loader_ts = make_loader(
-        ts_val, args.batch_size, False, args.num_workers, collate_time_scene
-    )
-
-    train_loader_vis = make_loader(
-        vis_train, args.batch_size, True, args.num_workers, collate_visibility
-    )
-    val_loader_vis = make_loader(
-        vis_val, args.batch_size, False, args.num_workers, collate_visibility
-    )
-
-    train_loader_road = make_loader(
-        road_train, args.batch_size, True, args.num_workers, collate_road_condition
-    )
-    val_loader_road = make_loader(
-        road_val, args.batch_size, False, args.num_workers, collate_road_condition
+    loaders = build_multitask_loaders(
+        datasets=datasets,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
     )
 
     model = ODDModel(freeze_backbone=False).to(device)
 
-    ckpt = torch.load(args.merged_ckpt, map_location="cpu")
-    state = ckpt.get("model", ckpt)
-    missing, unexpected = model.load_state_dict(state, strict=False)
+    missing, unexpected = load_model_ckpt(model, args.merged_ckpt)
     print("loaded merged ckpt:", args.merged_ckpt)
     print("missing keys:", missing)
     print("unexpected keys:", unexpected)
@@ -284,26 +95,18 @@ def main():
     opt = torch.optim.AdamW(params, lr=args.lr, weight_decay=args.weight_decay)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
 
-    if args.steps_per_epoch > 0:
-        steps_per_epoch = args.steps_per_epoch
-    else:
-        total_ratio = args.ts_ratio + args.vis_ratio + args.road_ratio
-        base_steps = max(
-            len(train_loader_ts),
-            math.ceil(len(train_loader_vis) / max(args.vis_ratio, 1)),
-            math.ceil(len(train_loader_road) / max(args.road_ratio, 1)),
-        )
-        steps_per_epoch = base_steps * total_ratio
-
-    pattern = (
-        ["ts"] * args.ts_ratio
-        + ["vis"] * args.vis_ratio
-        + ["road"] * args.road_ratio
+    steps_per_epoch = compute_stage1_steps_per_epoch(
+        loaders=loaders,
+        ts_ratio=args.ts_ratio,
+        vis_ratio=args.vis_ratio,
+        road_ratio=args.road_ratio,
+        steps_per_epoch=args.steps_per_epoch,
     )
+    pattern = build_pattern(args.ts_ratio, args.vis_ratio, args.road_ratio)
 
-    ts_iter = cycle_loader(train_loader_ts)
-    vis_iter = cycle_loader(train_loader_vis)
-    road_iter = cycle_loader(train_loader_road)
+    ts_iter = cycle_loader(loaders["train_ts"])
+    vis_iter = cycle_loader(loaders["train_vis"])
+    road_iter = cycle_loader(loaders["train_road"])
 
     best_score = -1.0
 
@@ -313,14 +116,18 @@ def main():
     print("lr:", args.lr)
     print("steps_per_epoch:", steps_per_epoch)
     print("pattern:", pattern)
-    print("train sizes:",
-          "ts=", len(ts_train),
-          "vis=", len(vis_train),
-          "road=", len(road_train))
-    print("val sizes:",
-          "ts=", len(ts_val),
-          "vis=", len(vis_val),
-          "road=", len(road_val))
+    print(
+        "train sizes:",
+        "ts=", len(datasets["ts_train"]),
+        "vis=", len(datasets["vis_train"]),
+        "road=", len(datasets["road_train"]),
+    )
+    print(
+        "val sizes:",
+        "ts=", len(datasets["ts_val"]),
+        "vis=", len(datasets["vis_val"]),
+        "road=", len(datasets["road_val"]),
+    )
 
     for epoch in range(1, args.epochs + 1):
         model.train()
@@ -341,6 +148,7 @@ def main():
 
             batch = move_batch_to_device(batch, device)
             batch = fill_missing_heads(batch)
+
             out = model(batch["images"])
             loss = odd_loss(out, batch)
 
@@ -371,9 +179,9 @@ def main():
         train_vis_loss = task_loss["vis"] / max(task_count["vis"], 1)
         train_road_loss = task_loss["road"] / max(task_count["road"], 1)
 
-        val_time_acc, val_scene_acc = eval_time_scene(model, val_loader_ts, device)
-        val_vis_acc = eval_visibility(model, val_loader_vis, device)
-        val_road_acc = eval_road_condition(model, val_loader_road, device)
+        val_time_acc, val_scene_acc = eval_time_scene(model, loaders["val_ts"], device)
+        val_vis_acc = eval_visibility(model, loaders["val_vis"], device)
+        val_road_acc = eval_road_condition(model, loaders["val_road"], device)
 
         score = 0.25 * val_time_acc + 0.25 * val_scene_acc + 0.25 * val_vis_acc + 0.25 * val_road_acc
 
@@ -404,14 +212,14 @@ def main():
             "args": vars(args),
         }
 
-        last_path = os.path.join(args.save_dir, "last.pt")
-        torch.save(state, last_path)
-
-        if score > best_score:
-            best_score = score
-            best_path = os.path.join(args.save_dir, "best.pt")
-            torch.save(state, best_path)
-            print("saved best to", best_path)
+        best_score, is_best = maybe_save_best(
+            state=state,
+            save_dir=args.save_dir,
+            score=score,
+            best_score=best_score,
+        )
+        if is_best:
+            print("saved best to", os.path.join(args.save_dir, "best.pt"))
 
 
 if __name__ == "__main__":

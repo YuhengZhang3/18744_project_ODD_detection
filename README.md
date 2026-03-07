@@ -1,178 +1,410 @@
-# 18744 Project - ODD Detection
-Code base for our 18744 ODD detection project.
+# 18744 Project - Multi-Head ODD Detection
 
-## Model
-Backbone  
-- DINOv2 ViT-L/14 from dinov2  
-- Input: 336 x 336 RGB image  
-- Output: CLS token and patch tokens
+This repository contains our 18-744 project code for image-level ODD attribute prediction with a shared visual backbone and multiple task-specific heads.
 
-Adapter  
-- Shared MLP on top of DINOv2 features  
-- LayerNorm + Linear + GELU  
-- Output dim: 1024
+## 1. Overview
 
-Heads (multi-head classifier)  
+We build a unified multi-head model for several ODD-related attributes:
 
-Global heads(use CLS feature)  
-- weather  
-- lighting 
-- time  
-- traffic  
-- road_condition
-- scene   
-
-Attentive heads (patch features with small attention pooling)  
-- anomalies 
-
-Each head is independent. Backbone and adapter are shared.  
-New heads can be added later without changing existing heads.
-
-
-## Current progress: BDD100K time + scene baseline
-
-We first focus on two ODD dimensions that can be directly trained from BDD100K:
 - time of day
 - scene type
+- visibility
+- road condition
 
-### Labels
+The model uses one shared image encoder and one shared adapter, then predicts each attribute with an independent classification head.
 
-We reuse the original BDD100K attributes:
+Our final pipeline has three stages:
 
-- **Time of day (`time` head)**  
-  - dawn/dusk  
-  - daytime  
-  - night  
-  - undefined  
+1. train single-task heads separately
+2. merge the trained heads into one unified model
+3. run joint multi-task finetuning to align all heads in the shared feature space
 
-- **Scene type (`scene` head)**  
-  - city street  
-  - gas stations  
-  - highway  
-  - parking lot  
-  - residential  
-  - tunnel  
-  - undefined  
+---
 
-These labels are parsed from the JSON files under `100k_label/{train,val}`.
+## 2. Model Structure
 
-### Model
+### Backbone
+- DINOv2 ViT-L/14
+- image input size: `336 x 336`
+- output features:
+  - CLS token feature
+  - patch token features
 
-We use a shared ViT backbone and multiple classifier heads:
+### Shared adapter
+A shared MLP adapter is applied on top of DINOv2 features.
 
-- backbone: DINOv2 ViT-L/14 (frozen)
-- one time head: 3 + 1 classes (dawn/dusk, daytime, night, undefined)
-- one scene head: 6 + 1 classes (city street, gas stations, highway, parking lot, residential, tunnel, undefined)
-- heads are simple MLPs on top of the global DINOv2 feature
+Current implementation:
+- shared across all heads
+- used to map backbone features to the task feature space
 
-Code:
-- `models/odd_model.py` – ODDModel with configurable heads
-- `configs/odd_config.py` – defines time/scene heads used in this stage
-- `data/bdd_dataset.py` – BDDDTimeScene dataset and collate
-- `scripts/train_time_scene_joint.py` – joint training script (epoch-based, ckpt + resume)
-- `scripts/eval_time_scene.py` – evaluation on BDD100K val set
+### Heads
+Current active heads in code:
 
-### Training setup
+- `time`
+- `scene`
+- `visibility`
+- `road_condition`
 
-- dataset: BDD100K `train` / `val` (100k split)
-- optimizer: AdamW, lr = 3e-4, weight decay = 0.05
-- scheduler: cosine LR, 15 epochs
-- batch size: 64 on a single A100 80GB
-- backbone frozen, only heads are trained
+In the current implementation, these heads are simple MLP heads on top of the shared global feature.
 
-### Results on BDD100K val
+Main related files:
+- `models/backbone_dinov2.py`
+- `models/heads.py`
+- `models/odd_model.py`
+- `configs/odd_config.py`
 
-**Time of day (overall ~93–94% acc)**
+---
 
-- dawn/dusk: 0.546  (425 / 778)  
-- daytime:   0.956  (5029 / 5258)  
-- night:     0.985  (3871 / 3929)  
-- undefined: 0.714  (25 / 35)  
+## 3. Datasets and Labels
 
-Time head is very strong on daytime and night. Dawn/dusk is harder and has fewer samples, which is expected.
+## 3.1 BDD100K
 
-**Scene type (overall ~80% acc)**
+We use BDD100K image-level attributes for three heads:
 
-- city street: 0.913  (5582 / 6112)  
-- gas stations: 0.571 (4 / 7)  
-- highway: 0.693      (1731 / 2499)  
-- parking lot: 0.571  (28 / 49)  
-- residential: 0.494  (619 / 1253)  
-- tunnel: 0.815       (22 / 27)  
-- undefined: 0.019    (1 / 53)  
+- `time`
+- `scene`
+- `visibility`
 
-City street is well recognized. Highway is moderate. Residential is more ambiguous and often confused with city street. The undefined class is noisy and mostly treated as a “don’t-care” bucket.
+### Data split
+BDD100K provides:
+- `train`
+- `val`
+- `test`
 
-This stage gives us a solid baseline for time and scene heads. Next steps will add more ODD dimensions (e.g. visibility, road condition, weather) on top of the same DINOv2 backbone.
+In our current experiments:
+- training uses `train`
+- model selection mainly uses `val`
+- final reporting can use `test`
 
-## Visibility labeling on BDD100K
+### Time head
+Source label:
+- BDD attribute `timeofday`
 
-Goal: build a 3-level visibility label (`vis ∈ {0,1,2}` = poor / medium / good) as one ODD dimension.
+Classes:
+- dawn/dusk
+- daytime
+- night
+- undefined
 
-### Source labels
+### Scene head
+Source label:
+- BDD attribute `scene`
 
-Use BDD100K attributes:
-
-- `weather` (clear, rainy, foggy, snowy, overcast, …)
-- `timeofday` (dawn/dusk, daytime, night, undefined)
-
-For analysis, images are grouped as: clear_day, clear_night, rainy, foggy, snowy.
-
-### CV features
-
-For each image, simple, dataset-agnostic features:
-
-- global grayscale contrast, global edge density
-- near-road ROI (lower-middle): contrast
-- far-road ROI (mid-height): contrast
-- sky/top region: contrast
-- basic blur / haze scores (Laplacian variance, dark-channel style score)
-
-No network training is used here; only low-level image statistics.
-
-### Current rule
-
-Visibility label:
-
-- `vis = 2` (good)  
-  - mainly daytime / dawn / dusk  
-  - near-road and far-road contrast above thresholds
-
-- `vis = 1` (medium)  
-  - mainly night scenes  
-  - near-road contrast high, far-road and sky contrast low
-
-- `vis = 0` (poor)  
-  - foggy scenes, or  
-  - both near-road and far-road contrast very low
-
-Implementation:
-
-- `scripts/label_visibility_bdd.py`  
-  - read BDD100K images + JSON  
-  - write extra JSON files to `datasets/visibility_labels/{train,val,test}` with:
-    - `visibility`, `weather`, `timeofday`, `near_contrast`, `far_contrast`
-
-- `scripts/vis_visibility_from_labels.py`  
-  - sample images per visibility level from val split  
-  - save grid `vis_visibility_samples_val.png` for manual sanity check
-
-Rough manual check on samples shows about 80–85% agreement with human judgment.  
-Thresholds are currently tuned on BDD100K and can be re-calibrated (e.g., via quantiles or a small classifier) for other datasets.
+Classes:
+- city street
+- gas stations
+- highway
+- parking lot
+- residential
+- tunnel
+- undefined
 
 ### Visibility head
+Visibility is not directly provided as an original BDD class.  
+We generate an additional 3-class label from image statistics and BDD attributes.
 
-- Use BDD100K image-level labels (`weather`, `timeofday`) and simple CV rules
-  (near/far contrast in gray image) to build a 3-class visibility label:
-  - 0 = poor, 1 = medium, 2 = good.
-- Labels are stored as JSON under `visibility_labels/{train,val,test}/*_vis.json`.
-- Train a separate head `visibility` on top of frozen DINOv2 features
-  using `scripts/train_visibility_head.py`.
+Classes:
+- poor
+- medium
+- good
 
-Current validation results on BDD100K val:
+Visibility label files are stored under:
+- `bdd100k/visibility_labels/train`
+- `bdd100k/visibility_labels/val`
+- `bdd100k/visibility_labels/test`
 
-- overall acc: **87.9%**
-- per class:
-  - poor: 80.4% (2245 samples)
-  - medium: 68.2% (1153 samples)
-  - good: 94.0% (6602 samples)
+Main related files:
+- `data/bdd_dataset.py`
+- `scripts/label_visibility_bdd.py`
+
+---
+
+## 3.2 RSCD
+
+We use RSCD for the `road_condition` head.
+
+### Data split
+RSCD provides:
+- `train-set`
+- `test-set`
+
+In training:
+- we train on RSCD train
+- for stage1/stage2 monitoring, we split RSCD train into train/val internally
+- final reporting uses RSCD official test
+
+### Road condition head
+The current implementation uses 27 classes:
+
+- dry_asphalt_smooth
+- dry_asphalt_slight
+- dry_asphalt_severe
+- dry_concrete_smooth
+- dry_concrete_slight
+- dry_concrete_severe
+- dry_gravel
+- dry_mud
+- fresh_snow
+- melted_snow
+- water_asphalt_smooth
+- water_asphalt_slight
+- water_asphalt_severe
+- water_concrete_smooth
+- water_concrete_slight
+- water_concrete_severe
+- water_gravel
+- water_mud
+- wet_asphalt_smooth
+- wet_asphalt_slight
+- wet_asphalt_severe
+- wet_concrete_smooth
+- wet_concrete_slight
+- wet_concrete_severe
+- wet_gravel
+- wet_mud
+- ice
+
+Main related files:
+- `data/rscd_dataset.py`
+- `scripts/train_road_condition_head.py`
+- `scripts/eval_road_condition_head.py`
+
+---
+
+## 4. Visibility Labeling Method
+
+We build visibility labels using BDD attributes and simple image statistics.
+
+### Inputs
+From BDD JSON:
+- `weather`
+- `timeofday`
+
+From image statistics:
+- near-road contrast
+- far-road contrast
+- sky/top-region contrast
+- blur / haze related scores
+
+### Output label
+We generate:
+- `0 = poor`
+- `1 = medium`
+- `2 = good`
+
+### Rule summary
+In general:
+- low contrast and fog-like conditions are labeled as poor
+- night scenes with partial visibility are labeled as medium
+- clear daytime scenes with strong near/far contrast are labeled as good
+
+This is a rule-based pseudo-labeling method used to create a train/val/test label set for the visibility head.
+
+Main scripts:
+- `scripts/label_visibility_bdd.py`
+- some older visualization / sanity-check scripts were used during development
+
+---
+
+## 5. Training Pipeline
+
+## 5.1 Single-head training
+
+We first trained several heads separately.
+
+### Time + Scene
+- dataset: BDD100K
+- split: train / val
+- script: `scripts/train_time_scene_joint.py`
+
+Important detail:
+- ViT backbone is frozen
+- adapter is updated in this stage
+- `time` and `scene` heads are trained jointly
+
+### Visibility
+- dataset: BDD100K with generated visibility labels
+- split: train / val
+- script: `scripts/train_visibility_head.py`
+
+Important detail:
+- backbone and adapter are frozen
+- only the `visibility` head is trained
+
+### Road condition
+- dataset: RSCD
+- split: official train / test
+- script: `scripts/train_road_condition_head.py`
+
+Important detail:
+- backbone and adapter are frozen
+- only the `road_condition` head is trained
+
+---
+
+## 5.2 Merge stage
+
+After separate training, we merge the trained heads into one model.
+
+Merge rule:
+- use `time_scene` checkpoint as base
+- overwrite `visibility` head from visibility checkpoint
+- overwrite `road_condition` head from RSCD checkpoint
+
+Script:
+- `scripts/merge_heads.py`
+
+Merged checkpoint:
+- `checkpoints_merged/odd_merged_heads.pt`
+
+Why this is needed:
+- it combines all trained heads into one shared model
+- but direct merge alone does not fully align all heads because they were trained under different feature conditions
+
+---
+
+## 5.3 Stage 1 joint finetuning
+
+Goal:
+- align all heads in one shared feature space
+
+Training strategy:
+- load merged checkpoint
+- freeze full backbone and adapter
+- train all heads jointly
+- alternate batches from:
+  - BDD time/scene
+  - BDD visibility
+  - RSCD road condition
+
+Script:
+- `scripts/train_joint_multidata_stage1.py`
+
+This stage mainly fixes head-feature mismatch after direct merge.
+
+---
+
+## 5.4 Stage 2 joint finetuning
+
+Goal:
+- further improve unified performance, especially for road condition
+
+Training strategy:
+- initialize from stage1 best checkpoint
+- keep ViT frozen
+- unfreeze shared adapter
+- train adapter + all heads jointly
+- increase road-condition training emphasis with:
+  - higher road sampling ratio
+  - larger road loss weight
+
+Script:
+- `scripts/train_joint_multidata_stage2.py`
+
+This stage gives better shared adaptation across tasks.
+
+---
+
+## 6. Evaluation Scripts
+
+Main evaluation scripts:
+
+- `scripts/eval_time_scene.py`
+- `scripts/eval_visibility_bdd.py`
+- `scripts/eval_road_condition_head.py`
+- `scripts/eval_road_condition_valsplit.py`
+- `scripts/eval_all_heads.py`
+
+`eval_all_heads.py` can be used to evaluate all heads together on:
+- BDD `val` or `test`
+- RSCD `test` or internal `valsplit`
+
+---
+
+## 7. Main Results
+
+Below are the current unified-model test results for three stages:
+
+- merged
+- stage1
+- stage2
+
+### 7.1 Overall test accuracy
+
+| model | time | scene | visibility | road_condition |
+|---|---:|---:|---:|---:|
+| merged | 0.9359 | 0.7951 | 0.2097 | 0.0611 |
+| stage1 | 0.9362 | 0.7924 | 0.8519 | 0.2778 |
+| stage2 | 0.9354 | 0.7918 | 0.8632 | 0.3472 |
+
+### 7.2 Result summary
+
+#### Merged
+Direct head merging preserves:
+- time
+- scene
+
+But visibility and road-condition performance collapse after direct merge, which shows that separately trained heads are not automatically aligned in the shared feature space.
+
+#### Stage 1
+Stage 1 recovers most of the lost performance:
+- time and scene remain stable
+- visibility improves strongly
+- road_condition improves clearly
+
+This shows that head-only joint finetuning is enough to fix most of the feature mismatch.
+
+#### Stage 2
+Stage 2 gives the best final unified model:
+- time remains stable
+- scene changes only slightly
+- visibility improves further
+- road_condition improves further
+
+This indicates that lightly adapting the shared adapter helps the model better support all tasks together.
+
+---
+
+## 8. Current Conclusion
+
+Our current experiments support the following conclusion:
+
+- directly merging independently trained heads is not enough
+- joint multi-task finetuning is necessary
+- stage1 fixes most of the head-feature mismatch
+- stage2 further improves unified performance, especially on road_condition
+- the final stage2 model is our current best unified multi-head ODD model
+
+Current best checkpoint:
+- `checkpoints_multitask_stage2/best.pt`
+
+---
+
+## 9. Main Files
+
+### Models
+- `models/backbone_dinov2.py`
+- `models/heads.py`
+- `models/odd_model.py`
+
+### Datasets
+- `data/bdd_dataset.py`
+- `data/rscd_dataset.py`
+
+### Single-task training
+- `scripts/train_time_scene_joint.py`
+- `scripts/train_visibility_head.py`
+- `scripts/train_road_condition_head.py`
+
+### Multi-stage unified training
+- `scripts/merge_heads.py`
+- `scripts/train_joint_multidata_stage1.py`
+- `scripts/train_joint_multidata_stage2.py`
+
+### Evaluation
+- `scripts/eval_time_scene.py`
+- `scripts/eval_visibility_bdd.py`
+- `scripts/eval_road_condition_head.py`
+- `scripts/eval_road_condition_valsplit.py`
+- `scripts/eval_all_heads.py`
+
