@@ -16,10 +16,6 @@ We predict four image-level attributes:
 The first three tasks are based on **BDD100K**.  
 The road-condition task is based on **RSCD**.
 
-Our main question is:
-
-> can separately trained task heads be merged into one model and then aligned through joint multi-task finetuning?
-
 ---
 
 ## 2. Method
