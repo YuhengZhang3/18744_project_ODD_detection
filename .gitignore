@@ -21,3 +21,13 @@ checkpoints/
 source_images/checkpoints_time_scene/
 *.pt
 *.png
+
+
+
+# local checkpoints / demo outputs
+checkpoints_local/
+demo_outputs/
+tmp_smoke_runs/
+
+# optional local experiment files
+*.log
