@@ -414,7 +414,17 @@ We compare three stages:
 
 ---
 
-## 6. Multi-Task Training and Results
+## 6. Inference Demo
+
+The following examples show unified inference on BDD validation images.  
+The red box indicates the road patch used for road-condition prediction.
+
+<p align="center">
+  <img src="assets/demo/demo_day.jpg" alt="daytime demo" width="48%">
+  <img src="assets/demo/demo_night.jpg" alt="night demo" width="48%">
+</p>
+
+## 7. Multi-Task Training and Results
 
 This project explores the unification of independent task heads into a single backbone for ODD (Operational Design Domain) attribute classification. Through a multi-stage process, we developed a balanced model for Time, Scene, Visibility, and Road Condition.
 
