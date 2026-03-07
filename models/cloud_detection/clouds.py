@@ -64,9 +64,6 @@ def process_images(input_dir="../../source_images", output_dir="output_boxes", j
         # 7. Create a binary mask for the sky
         sky_mask = (predictions == SKY_CLASS_ID).astype(np.uint8) * 255
 
-        # Convert BGR to Grayscale for overall luminance and glare detection
-        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-
         # Convert BGR to Grayscale for overall luminance
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
 
@@ -111,33 +108,41 @@ def process_images(input_dir="../../source_images", output_dir="output_boxes", j
                 p90_sky = 0.0
 
         # ==========================================
-        # 2. SMART GLARE DETECTION (Blob Filtering)
+        # 2. SMART GLARE DETECTION (HSV Saturation)
         # ==========================================
-        # Blur heavily to merge scattered bright spots
-        blurred_gray = cv2.GaussianBlur(gray, (15, 15), 0)
+        # 1. Convert to HSV specifically to extract color saturation and brightness
+        hsv_glare = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+        S_channel = hsv_glare[:, :, 1] # Saturation (0 = no color/white, 255 = fully saturated)
+        V_channel = hsv_glare[:, :, 2] # Value (0 = black, 255 = extremely bright)
         
-        # Threshold for extreme brightness
-        _, overexposed_mask = cv2.threshold(blurred_gray, 245, 255, cv2.THRESH_BINARY)
+        # 2. True glare is extremely bright AND mathematically devoid of color.
+        # This combination naturally ignores brightly painted lane lines, signs, and foliage.
+        raw_glare_mask = ((V_channel > 225) & (S_channel < 40)).astype(np.uint8) * 255
         
-        # Exclude the sky so we don't flag the normal sun
+        # 3. Exclude the sky so we don't flag the normal sun
         non_sky_mask = cv2.bitwise_not(sky_mask)
-        potential_glare = cv2.bitwise_and(overexposed_mask, overexposed_mask, mask=non_sky_mask)
+        potential_glare = cv2.bitwise_and(raw_glare_mask, raw_glare_mask, mask=non_sky_mask)
         
-        # Exclude the bottom 20% of the image (ignores ego-car hood reflections)
+        # 4. Exclude the bottom 20% of the image (ignores ego-car hood reflections)
         cutoff_y = int(original_h * 0.8)
         potential_glare[cutoff_y:, :] = 0
 
-        # Find contiguous blobs of brightness
-        contours, _ = cv2.findContours(potential_glare, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 5. Morphological CLOSE to fuse broken pieces of glare together
+        # (bridges gaps caused by tree branches, wires, or the rearview mirror)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+        fused_glare = cv2.morphologyEx(potential_glare, cv2.MORPH_CLOSE, kernel)
+
+        # 6. Find contiguous blobs
+        contours, _ = cv2.findContours(fused_glare, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         dangerous_glare_mask = np.zeros_like(gray)
         total_image_area = original_h * original_w
         
         for contour in contours:
             area = cv2.contourArea(contour)
-            # A blob must be larger than 1.5% of the total image to be considered "blinding"
-            # This ignores white cars, streetlights, and painted lane lines
-            if area > (total_image_area * 0.015):
+            # A blob must be larger than 0.5% of the total image to be considered "blinding"
+            # Since HSV is a strict filter, 0.5% accurately captures real sun bursts without triggering on noise.
+            if area > (total_image_area * 0.005):
                 cv2.drawContours(dangerous_glare_mask, [contour], -1, 255, -1)
 
         glare_pixel_count = np.count_nonzero(dangerous_glare_mask)

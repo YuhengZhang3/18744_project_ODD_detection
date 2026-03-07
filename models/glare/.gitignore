@@ -1,0 +1,7 @@
+*.json
+*.png
+*.jpg
+glaredetection
+glare_comparisons
+glare_predictions
+custom_glare_model
