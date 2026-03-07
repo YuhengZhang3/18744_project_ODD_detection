@@ -18,6 +18,7 @@ from utils.single_head_utils import (
     move_batch_to_device,
     save_last_and_best,
 )
+from utils.multitask_data import fill_missing_heads
 
 
 def eval_time_scene(model, loader, device):
@@ -129,6 +130,7 @@ def main():
 
         for batch in train_loader:
             batch = move_batch_to_device(batch, device)
+            batch = fill_missing_heads(batch)
 
             out = model(batch["images"])
             loss = odd_loss(out, batch)

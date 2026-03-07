@@ -1,96 +1,73 @@
-# 18744 Project - Multi-Head ODD Detection
 
-This repository contains our 18-744 project code for image-level ODD attribute prediction with a shared visual backbone and multiple task-specific heads.
+# 18744 Project: Unified Multi-Head ODD Detection
 
-## 1. Overview
+This project studies unified image-level ODD attribute prediction with one shared visual backbone and multiple task-specific heads.  
+The goal is to support several ODD-related attributes in a single model instead of training fully independent models for each task.
 
-We build a unified multi-head model for several ODD-related attributes:
+## 1. Task Overview
 
-- time of day
-- scene type
-- visibility
-- road condition
+We predict four image-level attributes:
 
-The model uses one shared image encoder and one shared adapter, then predicts each attribute with an independent classification head.
+- **time of day**
+- **scene type**
+- **visibility**
+- **road condition**
 
-Our final pipeline has three stages:
+The first three tasks are based on **BDD100K**.  
+The road-condition task is based on **RSCD**.
 
-1. train single-task heads separately
-2. merge the trained heads into one unified model
-3. run joint multi-task finetuning to align all heads in the shared feature space
+Our main question is:
+
+> can separately trained task heads be merged into one model and then aligned through joint multi-task finetuning?
 
 ---
 
-## 2. Model Structure
+## 2. Method
 
-### Backbone
-- DINOv2 ViT-L/14
-- image input size: `336 x 336`
-- output features:
-  - CLS token feature
-  - patch token features
+## 2.1 Model
+
+We use a shared visual encoder with multiple classification heads.
+
+### Shared backbone
+- **DINOv2 ViT-L/14**
+- one shared feature extractor for all tasks
 
 ### Shared adapter
-A shared MLP adapter is applied on top of DINOv2 features.
+A shared adapter is applied after the backbone features.  
+This adapter is important because it becomes the common feature interface for all heads during multi-task training.
 
-Current implementation:
-- shared across all heads
-- used to map backbone features to the task feature space
+### Task heads
+We use one classification head per task:
 
-### Heads
-Current active heads in code:
-
-- `time`
-- `scene`
-- `visibility`
-- `road_condition`
-
-In the current implementation, these heads are simple MLP heads on top of the shared global feature.
-
-Main related files:
-- `models/backbone_dinov2.py`
-- `models/heads.py`
-- `models/odd_model.py`
-- `configs/odd_config.py`
+- **time head**: predicts 4 classes
+- **scene head**: predicts 7 classes
+- **visibility head**: predicts 3 classes
+- **road_condition head**: predicts 27 classes
 
 ---
 
-## 3. Datasets and Labels
+## 2.2 Datasets
 
-## 3.1 BDD100K
+### BDD100K
+BDD100K is used for:
+- time
+- scene
+- visibility
 
-We use BDD100K image-level attributes for three heads:
-
-- `time`
-- `scene`
-- `visibility`
-
-### Data split
-BDD100K provides:
+BDD provides:
 - `train`
 - `val`
 - `test`
 
-In our current experiments:
-- training uses `train`
-- model selection mainly uses `val`
-- final reporting can use `test`
+For **time** and **scene**, labels come directly from BDD attributes.
 
-### Time head
-Source label:
-- BDD attribute `timeofday`
-
-Classes:
+#### Time classes
 - dawn/dusk
 - daytime
 - night
 - undefined
 
-### Scene head
-Source label:
-- BDD attribute `scene`
-
-Classes:
+#### Scene classes
 - city street
 - gas stations
 - highway
@@ -99,43 +76,15 @@ Classes:
 - tunnel
 - undefined
 
-### Visibility head
-Visibility is not directly provided as an original BDD class.  
-We generate an additional 3-class label from image statistics and BDD attributes.
+### RSCD
+RSCD is used for:
+- road condition
 
-Classes:
-- poor
-- medium
-- good
-
-Visibility label files are stored under:
-- `bdd100k/visibility_labels/train`
-- `bdd100k/visibility_labels/val`
-- `bdd100k/visibility_labels/test`
-
-Main related files:
-- `data/bdd_dataset.py`
-- `scripts/label_visibility_bdd.py`
-
----
-
-## 3.2 RSCD
-
-We use RSCD for the `road_condition` head.
-
-### Data split
 RSCD provides:
-- `train-set`
-- `test-set`
+- official train split
+- official test split
 
-In training:
-- we train on RSCD train
-- for stage1/stage2 monitoring, we split RSCD train into train/val internally
-- final reporting uses RSCD official test
-
-### Road condition head
-The current implementation uses 27 classes:
-
+#### Road-condition classes
 - dry_asphalt_smooth
 - dry_asphalt_slight
 - dry_asphalt_severe
@@ -164,247 +113,358 @@ The current implementation uses 27 classes:
 - wet_mud
 - ice
 
-Main related files:
-- `data/rscd_dataset.py`
-- `scripts/train_road_condition_head.py`
-- `scripts/eval_road_condition_head.py`
+---
+
+## 2.3 Visibility Label Generation
+
+BDD does not directly provide our final 3-class visibility label, so we generate it with a rule-based labeling pipeline.
+
+The visibility label uses:
+- BDD metadata such as weather and time of day
+- image appearance cues such as contrast and visibility-related statistics
+
+Final visibility classes:
+- **poor**
+- **medium**
+- **good**
+
+This gives us generated visibility labels for:
+- train
+- val
+- test
+
+So visibility can be trained and evaluated like the other BDD tasks.
 
 ---
 
-## 4. Visibility Labeling Method
+## 3. Training Pipeline
 
-We build visibility labels using BDD attributes and simple image statistics.
+We use a three-stage pipeline.
 
-### Inputs
-From BDD JSON:
-- `weather`
-- `timeofday`
+## 3.1 Stage 0: Separate training for single heads
 
-From image statistics:
-- near-road contrast
-- far-road contrast
-- sky/top-region contrast
-- blur / haze related scores
-
-### Output label
-We generate:
-- `0 = poor`
-- `1 = medium`
-- `2 = good`
-
-### Rule summary
-In general:
-- low contrast and fog-like conditions are labeled as poor
-- night scenes with partial visibility are labeled as medium
-- clear daytime scenes with strong near/far contrast are labeled as good
-
-This is a rule-based pseudo-labeling method used to create a train/val/test label set for the visibility head.
-
-Main scripts:
-- `scripts/label_visibility_bdd.py`
-- some older visualization / sanity-check scripts were used during development
-
----
-
-## 5. Training Pipeline
-
-## 5.1 Single-head training
-
-We first trained several heads separately.
+Before building one unified model, we first train task heads separately.
 
 ### Time + Scene
-- dataset: BDD100K
-- split: train / val
-- script: `scripts/train_time_scene_joint.py`
-
-Important detail:
-- ViT backbone is frozen
-- adapter is updated in this stage
-- `time` and `scene` heads are trained jointly
+- trained jointly on BDD
+- ViT is frozen
+- adapter is still trainable in this stage
 
 ### Visibility
-- dataset: BDD100K with generated visibility labels
-- split: train / val
-- script: `scripts/train_visibility_head.py`
-
-Important detail:
+- trained on BDD with generated visibility labels
 - backbone and adapter are frozen
-- only the `visibility` head is trained
+- only the visibility head is trained
 
-### Road condition
-- dataset: RSCD
-- split: official train / test
-- script: `scripts/train_road_condition_head.py`
-
-Important detail:
+### Road Condition
+- trained on RSCD
 - backbone and adapter are frozen
-- only the `road_condition` head is trained
+- only the road-condition head is trained
+
+This gives us several independently trained heads.
 
 ---
 
-## 5.2 Merge stage
+## 3.2 Stage 1: Direct merge
 
-After separate training, we merge the trained heads into one model.
+We then merge the separately trained heads into one unified model.
 
 Merge rule:
-- use `time_scene` checkpoint as base
-- overwrite `visibility` head from visibility checkpoint
-- overwrite `road_condition` head from RSCD checkpoint
+- use the time/scene checkpoint as the base
+- overwrite the visibility head with the visibility checkpoint
+- overwrite the road-condition head with the RSCD checkpoint
 
-Script:
-- `scripts/merge_heads.py`
+This creates one model containing all four heads.
 
-Merged checkpoint:
-- `checkpoints_merged/odd_merged_heads.pt`
-
-Why this is needed:
-- it combines all trained heads into one shared model
-- but direct merge alone does not fully align all heads because they were trained under different feature conditions
+However, direct merge alone is not sufficient, because the heads were trained under different feature conditions.  
+In particular, visibility and road-condition heads are not automatically aligned with the shared adapter learned by the time/scene branch.
 
 ---
 
-## 5.3 Stage 1 joint finetuning
+## 3.3 Stage 2: Head-only joint finetuning
 
-Goal:
-- align all heads in one shared feature space
+After direct merge, we run joint multi-task finetuning while freezing the shared backbone and adapter.
 
-Training strategy:
-- load merged checkpoint
-- freeze full backbone and adapter
-- train all heads jointly
-- alternate batches from:
-  - BDD time/scene
-  - BDD visibility
-  - RSCD road condition
+Training data are mixed across:
+- BDD time/scene
+- BDD visibility
+- RSCD road condition
 
-Script:
-- `scripts/train_joint_multidata_stage1.py`
+At this stage:
+- all heads are trained together
+- the shared feature extractor is fixed
+- the goal is to align all heads to the same shared representation
 
-This stage mainly fixes head-feature mismatch after direct merge.
+This stage mainly fixes the large mismatch caused by direct merge.
 
 ---
 
-## 5.4 Stage 2 joint finetuning
+## 3.4 Stage 3: Adapter finetuning
 
-Goal:
-- further improve unified performance, especially for road condition
+Finally, we continue joint multi-task training with a lighter update of the shared representation.
 
-Training strategy:
-- initialize from stage1 best checkpoint
-- keep ViT frozen
-- unfreeze shared adapter
-- train adapter + all heads jointly
-- increase road-condition training emphasis with:
-  - higher road sampling ratio
-  - larger road loss weight
+At this stage:
+- ViT remains frozen
+- the shared adapter is unfrozen
+- all heads continue training jointly
 
-Script:
-- `scripts/train_joint_multidata_stage2.py`
+To better support the harder road-condition task, we additionally give more emphasis to road-condition training by:
+- increasing road-condition sampling frequency
+- increasing road-condition loss weight
 
-This stage gives better shared adaptation across tasks.
+This stage improves final unified performance, especially on road condition.
 
 ---
 
-## 6. Evaluation Scripts
+## 4. Evaluation Setup
 
-Main evaluation scripts:
-
-- `scripts/eval_time_scene.py`
-- `scripts/eval_visibility_bdd.py`
-- `scripts/eval_road_condition_head.py`
-- `scripts/eval_road_condition_valsplit.py`
-- `scripts/eval_all_heads.py`
-
-`eval_all_heads.py` can be used to evaluate all heads together on:
-- BDD `val` or `test`
-- RSCD `test` or internal `valsplit`
-
----
-
-## 7. Main Results
-
-Below are the current unified-model test results for three stages:
-
-- merged
-- stage1
-- stage2
-
-### 7.1 Overall test accuracy
-
-| model | time | scene | visibility | road_condition |
-|---|---:|---:|---:|---:|
-| merged | 0.9359 | 0.7951 | 0.2097 | 0.0611 |
-| stage1 | 0.9362 | 0.7924 | 0.8519 | 0.2778 |
-| stage2 | 0.9354 | 0.7918 | 0.8632 | 0.3472 |
-
-### 7.2 Result summary
-
-#### Merged
-Direct head merging preserves:
+### BDD tasks
+For:
 - time
 - scene
+- visibility
 
-But visibility and road-condition performance collapse after direct merge, which shows that separately trained heads are not automatically aligned in the shared feature space.
+we report results on **BDD test**.
 
-#### Stage 1
-Stage 1 recovers most of the lost performance:
-- time and scene remain stable
-- visibility improves strongly
-- road_condition improves clearly
+### RSCD task
+For:
+- road condition
 
-This shows that head-only joint finetuning is enough to fix most of the feature mismatch.
+we report results on **RSCD official test**.
 
-#### Stage 2
-Stage 2 gives the best final unified model:
+So the final table below is a unified test-time summary:
+- BDD test for time / scene / visibility
+- RSCD test for road condition
+
+---
+
+## 5. Main Results
+
+We compare three stages:
+
+- **Merged**: direct merge without joint alignment
+- **Stage 1**: head-only joint finetuning
+- **Stage 2**: adapter + head joint finetuning
+
+## 5.1 Overall test accuracy
+
+| Model | Time | Scene | Visibility | Road Condition |
+|---|---:|---:|---:|---:|
+| Merged | 0.9359 | 0.7951 | 0.2097 | 0.0611 |
+| Stage 1 | 0.9362 | 0.7924 | 0.8519 | 0.2778 |
+| Stage 2 | 0.9354 | 0.7918 | 0.8632 | 0.3472 |
+
+---
+
+## 5.2 Time: per-class test accuracy
+
+### Merged
+- dawn/dusk: 0.537 (793/1476)
+- daytime: 0.955 (9981/10446)
+- night: 0.985 (7919/8036)
+- undefined: 0.619 (26/42)
+
+### Stage 1
+- dawn/dusk: 0.493 (728/1476)
+- daytime: 0.961 (10036/10446)
+- night: 0.987 (7934/8036)
+- undefined: 0.619 (26/42)
+
+### Stage 2
+- dawn/dusk: 0.479 (707/1476)
+- daytime: 0.961 (10042/10446)
+- night: 0.987 (7933/8036)
+- undefined: 0.619 (26/42)
+
+---
+
+## 5.3 Scene: per-class test accuracy
+
+### Merged
+- city street: 0.910 (11178/12288)
+- gas stations: 0.667 (4/6)
+- highway: 0.688 (3488/5069)
+- parking lot: 0.602 (65/108)
+- residential: 0.473 (1127/2382)
+- tunnel: 0.735 (36/49)
+- undefined: 0.041 (4/98)
+
+### Stage 1
+- city street: 0.882 (10835/12288)
+- gas stations: 0.167 (1/6)
+- highway: 0.703 (3563/5069)
+- parking lot: 0.583 (63/108)
+- residential: 0.568 (1352/2382)
+- tunnel: 0.633 (31/49)
+- undefined: 0.041 (4/98)
+
+### Stage 2
+- city street: 0.877 (10779/12288)
+- gas stations: 0.167 (1/6)
+- highway: 0.704 (3571/5069)
+- parking lot: 0.574 (62/108)
+- residential: 0.583 (1389/2382)
+- tunnel: 0.612 (30/49)
+- undefined: 0.041 (4/98)
+
+---
+
+## 5.4 Visibility: per-class test accuracy
+
+### Merged
+- poor: 0.028 (130/4619)
+- medium: 0.102 (242/2383)
+- good: 0.294 (3821/12998)
+
+### Stage 1
+- poor: 0.804 (3712/4619)
+- medium: 0.528 (1259/2383)
+- good: 0.928 (12067/12998)
+
+### Stage 2
+- poor: 0.824 (3806/4619)
+- medium: 0.552 (1316/2383)
+- good: 0.934 (12142/12998)
+
+---
+
+## 5.5 Road Condition: per-class test accuracy
+
+### Merged
+- dry_asphalt_smooth: 0.096 (7/73)
+- dry_asphalt_slight: 0.385 (5/13)
+- dry_asphalt_severe: 0.000 (0/5)
+- dry_concrete_smooth: 0.000 (0/19)
+- dry_concrete_slight: 0.000 (0/10)
+- dry_concrete_severe: 0.000 (0/0)
+- dry_gravel: 0.056 (1/18)
+- dry_mud: 0.048 (1/21)
+- fresh_snow: 0.000 (0/0)
+- melted_snow: 0.000 (0/0)
+- water_asphalt_smooth: 0.250 (1/4)
+- water_asphalt_slight: 0.000 (0/1)
+- water_asphalt_severe: 0.000 (0/0)
+- water_concrete_smooth: 0.000 (0/11)
+- water_concrete_slight: 0.000 (0/5)
+- water_concrete_severe: 0.000 (0/0)
+- water_gravel: 0.000 (0/5)
+- water_mud: 0.000 (0/11)
+- wet_asphalt_smooth: 0.083 (7/84)
+- wet_asphalt_slight: 0.000 (0/31)
+- wet_asphalt_severe: 0.000 (0/1)
+- wet_concrete_smooth: 0.000 (0/16)
+- wet_concrete_slight: 0.000 (0/7)
+- wet_concrete_severe: 0.000 (0/1)
+- wet_gravel: 0.000 (0/4)
+- wet_mud: 0.000 (0/20)
+- ice: 0.000 (0/0)
+
+### Stage 1
+- dry_asphalt_smooth: 0.521 (38/73)
+- dry_asphalt_slight: 0.154 (2/13)
+- dry_asphalt_severe: 0.200 (1/5)
+- dry_concrete_smooth: 0.263 (5/19)
+- dry_concrete_slight: 0.000 (0/10)
+- dry_concrete_severe: 0.000 (0/0)
+- dry_gravel: 0.444 (8/18)
+- dry_mud: 0.095 (2/21)
+- fresh_snow: 0.000 (0/0)
+- melted_snow: 0.000 (0/0)
+- water_asphalt_smooth: 0.000 (0/4)
+- water_asphalt_slight: 1.000 (1/1)
+- water_asphalt_severe: 0.000 (0/0)
+- water_concrete_smooth: 0.000 (0/11)
+- water_concrete_slight: 0.000 (0/5)
+- water_concrete_severe: 0.000 (0/0)
+- water_gravel: 0.200 (1/5)
+- water_mud: 0.182 (2/11)
+- wet_asphalt_smooth: 0.298 (25/84)
+- wet_asphalt_slight: 0.097 (3/31)
+- wet_asphalt_severe: 0.000 (0/1)
+- wet_concrete_smooth: 0.375 (6/16)
+- wet_concrete_slight: 0.000 (0/7)
+- wet_concrete_severe: 0.000 (0/1)
+- wet_gravel: 0.000 (0/4)
+- wet_mud: 0.300 (6/20)
+- ice: 0.000 (0/0)
+
+### Stage 2
+- dry_asphalt_smooth: 0.548 (40/73)
+- dry_asphalt_slight: 0.077 (1/13)
+- dry_asphalt_severe: 0.800 (4/5)
+- dry_concrete_smooth: 0.474 (9/19)
+- dry_concrete_slight: 0.000 (0/10)
+- dry_concrete_severe: 0.000 (0/0)
+- dry_gravel: 0.611 (11/18)
+- dry_mud: 0.048 (1/21)
+- fresh_snow: 0.000 (0/0)
+- melted_snow: 0.000 (0/0)
+- water_asphalt_smooth: 0.000 (0/4)
+- water_asphalt_slight: 0.000 (0/1)
+- water_asphalt_severe: 0.000 (0/0)
+- water_concrete_smooth: 0.000 (0/11)
+- water_concrete_slight: 0.000 (0/5)
+- water_concrete_severe: 0.000 (0/0)
+- water_gravel: 0.600 (3/5)
+- water_mud: 0.455 (5/11)
+- wet_asphalt_smooth: 0.381 (32/84)
+- wet_asphalt_slight: 0.097 (3/31)
+- wet_asphalt_severe: 0.000 (0/1)
+- wet_concrete_smooth: 0.438 (7/16)
+- wet_concrete_slight: 0.000 (0/7)
+- wet_concrete_severe: 0.000 (0/1)
+- wet_gravel: 0.000 (0/4)
+- wet_mud: 0.450 (9/20)
+- ice: 0.000 (0/0)
+
+---
+
+## 6. Discussion
+
+### Direct merge is not enough
+The merged model already preserves strong performance on **time** and **scene**, but **visibility** and **road condition** collapse badly after direct merge.  
+This shows that independently trained heads are not automatically compatible with one shared feature space.
+
+### Stage 1 fixes most of the mismatch
+After head-only joint finetuning:
 - time remains stable
 - scene changes only slightly
+- visibility improves dramatically
+- road condition also improves clearly
+
+So most of the mismatch comes from head-feature misalignment rather than complete task incompatibility.
+
+### Stage 2 gives the best unified model
+After lightly finetuning the shared adapter:
+- time remains stable
+- scene stays close to stage 1
 - visibility improves further
-- road_condition improves further
+- road condition improves further
 
-This indicates that lightly adapting the shared adapter helps the model better support all tasks together.
-
----
-
-## 8. Current Conclusion
-
-Our current experiments support the following conclusion:
-
-- directly merging independently trained heads is not enough
-- joint multi-task finetuning is necessary
-- stage1 fixes most of the head-feature mismatch
-- stage2 further improves unified performance, especially on road_condition
-- the final stage2 model is our current best unified multi-head ODD model
-
-Current best checkpoint:
-- `checkpoints_multitask_stage2/best.pt`
+This gives the best balanced unified model across all tasks.
 
 ---
 
-## 9. Main Files
+## 7. Current Best Model
 
-### Models
-- `models/backbone_dinov2.py`
-- `models/heads.py`
-- `models/odd_model.py`
+The current best unified model is:
 
-### Datasets
-- `data/bdd_dataset.py`
-- `data/rscd_dataset.py`
+- **Stage 2**
+- checkpoint: `checkpoints_multitask_stage2/best.pt`
 
-### Single-task training
-- `scripts/train_time_scene_joint.py`
-- `scripts/train_visibility_head.py`
-- `scripts/train_road_condition_head.py`
+This model gives the best overall balance across:
+- time
+- scene
+- visibility
+- road condition
 
-### Multi-stage unified training
-- `scripts/merge_heads.py`
-- `scripts/train_joint_multidata_stage1.py`
-- `scripts/train_joint_multidata_stage2.py`
+---
 
-### Evaluation
-- `scripts/eval_time_scene.py`
-- `scripts/eval_visibility_bdd.py`
-- `scripts/eval_road_condition_head.py`
-- `scripts/eval_road_condition_valsplit.py`
-- `scripts/eval_all_heads.py`
+## 8. Summary
 
+This project shows that:
+
+- separate task heads can be trained independently first
+- direct merge alone is not sufficient
+- head-only joint finetuning is highly effective
+- light shared-adapter finetuning further improves unified multi-task performance
+- the final unified model performs well on multiple ODD-related attributes with one shared backbone
