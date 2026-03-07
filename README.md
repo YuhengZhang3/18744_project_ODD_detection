@@ -414,53 +414,23 @@ We compare three stages:
 
 ---
 
-## 6. Discussion
+## 6. Multi-Task Training and Results
 
-### Direct merge is not enough
-The merged model already preserves strong performance on **time** and **scene**, but **visibility** and **road condition** collapse badly after direct merge.  
-This shows that independently trained heads are not automatically compatible with one shared feature space.
+This project explores the unification of independent task heads into a single backbone for ODD (Operational Design Domain) attribute classification. Through a multi-stage process, we developed a balanced model for Time, Scene, Visibility, and Road Condition.
 
-### Stage 1 fixes most of the mismatch
-After head-only joint finetuning:
-- time remains stable
-- scene changes only slightly
-- visibility improves dramatically
-- road condition also improves clearly
+### Training Strategy Evolution
+Experimental results show that a direct merge of independently trained heads is insufficient because heads are not automatically compatible with a shared feature space. A multi-stage finetuning approach was required to resolve this misalignment:
 
-So most of the mismatch comes from head-feature misalignment rather than complete task incompatibility.
+* **Stage 0: Direct Merge** – Time and Scene performance remains stable, but Visibility and Road Condition collapse.
+* **Stage 1: Head-Only Joint Finetuning** – Dramatically improves Visibility and Road Condition, proving that the issue is head-feature misalignment rather than task incompatibility.
+* **Stage 2: Shared Adapter Finetuning** – Lightly tuning the shared adapter further improves performance across all attributes, resulting in the most balanced unified model.
 
-### Stage 2 gives the best unified model
-After lightly finetuning the shared adapter:
-- time remains stable
-- scene stays close to stage 1
-- visibility improves further
-- road condition improves further
+### Key Results
+The progression from Stage 0 to Stage 2 demonstrates a clear improvement in model stability and accuracy:
+- **Time and Scene:** Performance remained stable throughout all stages.
+- **Visibility and Road Condition:** These tasks showed dramatic recovery in Stage 1 and reached peak performance in Stage 2.
 
-This gives the best balanced unified model across all tasks.
-
----
-
-## 7. Current Best Model
-
-The current best unified model is:
-
-- **Stage 2**
-- checkpoint: `checkpoints_multitask_stage2/best.pt`
-
-This model gives the best overall balance across:
-- time
-- scene
-- visibility
-- road condition
-
----
-
-## 8. Summary
-
-This project shows that:
-
-- separate task heads can be trained independently first
-- direct merge alone is not sufficient
-- head-only joint finetuning is highly effective
-- light shared-adapter finetuning further improves unified multi-task performance
-- the final unified model performs well on multiple ODD-related attributes with one shared backbone
+### Final Unified Model
+The Stage 2 model provides the best overall balance across all four tasks using a single shared backbone.
+- **Best Checkpoint:** checkpoints_multitask_stage2/best.pt
+- **Summary:** Head-only joint finetuning followed by light shared-adapter tuning is highly effective for consolidating separate task-specific models into one efficient system.
