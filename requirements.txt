@@ -7,3 +7,10 @@ torch
 torchvision
 opencv-python
 numpy
+
+matplotlib
+opencv_python
+Pillow
+tqdm
+transformers
+ultralytics

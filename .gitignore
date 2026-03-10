@@ -16,6 +16,11 @@ venv/
 
 # output data
 data/*.jsonl
+data/yolo*/
+data/bdd100k_val/
+data/roadwork/
+data/pre_aug_yolo_labels/
+runs/
 outputs/
 checkpoints/
 source_images/checkpoints_time_scene/

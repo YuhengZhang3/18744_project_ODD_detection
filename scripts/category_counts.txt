@@ -1,0 +1,45 @@
+Cone: 8688
+Tubular Marker: 5683
+Work Vehicle: 5437
+Drum: 5336
+Barrier: 2661
+Barricade: 2612
+Temporary Traffic Control Sign: 2497
+Worker: 2117
+Fence: 1987
+Vertical Panel: 1195
+Arrow Board: 547
+Work Equipment: 300
+Temporary Traffic Control Sign: Other: 211
+Temporary Traffic Control Sign: up arrow: 133
+Temporary Traffic Control Sign: two lane shift arrows: 114
+Temporary Traffic Control Sign: left chevron: 114
+Temporary Traffic Control Message Board: 113
+Police Vehicle: 106
+Temporary Traffic Control Sign: left arrow: 89
+Police Officer: 70
+Temporary Traffic Control Sign: right arrow: 49
+Temporary Traffic Control Sign: right lane ends sign: 47
+Temporary Traffic Control Sign: bent left arrow: 46
+Temporary Traffic Control Sign: right chevron: 46
+Temporary Traffic Control Sign: up diagonal right arrow: 44
+Temporary Traffic Control Sign: bent right arrow: 24
+Temporary Traffic Control Sign: pedestrian: right arrow: 21
+Bike Lane: 21
+Temporary Traffic Control Sign: no left turn: 16
+Other Roadwork Objects: 11
+Temporary Traffic Control Sign: do not enter sign: 11
+Temporary Traffic Control Sign: lane shift arrow: 10
+Temporary Traffic Control Sign: two downward diagonal arrows: 8
+Temporary Traffic Control Sign: curved left arrow: 7
+Temporary Traffic Control Sign: down diagonal left arrow: 6
+Temporary Traffic Control Sign: curved right arrow: 6
+Temporary Traffic Control Sign: pedestrian: left arrow: 5
+Temporary Traffic Control Sign: flagger: 5
+Temporary Traffic Control Sign: bicycle: 5
+Temporary Traffic Control Sign: left lane ends sign: 4
+Temporary Traffic Control Sign: up diagonal left arrow: 2
+Temporary Traffic Control Sign: bi-directional arrow: 2
+Temporary Traffic Control Sign: curved left arrow, curved right arrow: 1
+Temporary Traffic Control Sign: work vehicle: 1
+Temporary Traffic Control Sign: two upward diagonal arrows: 1
