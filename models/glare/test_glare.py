@@ -52,21 +52,18 @@ def evaluate_test_set(model_dir="custom_glare_model", test_dir="../../source_ima
         # 4. Get the predicted class (0 = Background, 1 = Glare)
         predicted_mask = logits.argmax(dim=1)[0].cpu().numpy()
 
-        # 5. Draw the detection regions
-        overlay = img_bgr.copy()
-        # Mark predicted glare pixels with bright yellow [0, 255, 255] in BGR
-        overlay[predicted_mask == 1] = [0, 255, 255] 
-        
-        # Blend the original image and the yellow overlay (70% original, 30% yellow)
-        result = cv2.addWeighted(img_bgr, 0.7, overlay, 0.3, 0)
+        # 5. Convert to a pure binary mask (Background = 0, Glare = 255)
+        mask_img = (predicted_mask * 255).astype(np.uint8)
 
-        # 6. Save the result
+        # 6. Save ONLY the mask as a lossless PNG
         filename = os.path.basename(img_path)
-        output_filename = os.path.join(output_dir, f"{filename}")
-        cv2.imwrite(output_filename, result)
-        print(f"Processed and saved: {output_filename}")
+        basename = os.path.splitext(filename)[0]
+        output_filename = os.path.join(output_dir, f"{basename}.png")
+        
+        cv2.imwrite(output_filename, mask_img)
+        print(f"Processed and saved mask: {output_filename}")
 
-    print(f"\nDone! Check the '{output_dir}' folder to review the glare detection regions.")
+    print(f"\nDone! Check the '{output_dir}' folder to review the isolated glare masks.")
 
 if __name__ == "__main__":
     evaluate_test_set()

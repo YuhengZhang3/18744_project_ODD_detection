@@ -9,14 +9,19 @@ __pycache__/
 .venv
 venv/
 .idea/
+**/__pycache__
 
 # meta files
 .vscode/
 .DS_Store
 
 # output data
+datasets/
 data/*.jsonl
 outputs/
 checkpoints/
 source_images/
 output_json/
+
+# large files
+*.tar.gz

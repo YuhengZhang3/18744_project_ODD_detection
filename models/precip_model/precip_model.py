@@ -10,14 +10,12 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 from sklearn.model_selection import train_test_split
 
-# TRAINING NEEDED (images in images/ and truth in json/)
-# Extract into this directory:
-# https://drive.google.com/file/d/1fUd2U0fUB2yUssYNCjagftcWgbDij1Iz/view?usp=sharing
+# TRAINING NEEDED
 
 # ---------------- CONFIG ----------------
 
-IMAGES_DIR = "images"
-JSON_DIR = "json"
+IMAGES_DIR = "../../datasets/acdc_labeled/images"
+JSON_DIR = "../../datasets/acdc_labeled/labels"
 
 IMG_SIZE = 224
 BATCH_SIZE = 64
