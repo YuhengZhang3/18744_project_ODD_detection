@@ -8,3 +8,6 @@ numpy
 # precipitation
 scikit-learn
 tqdm
+ultralytics
+matplotlib
+Pillow

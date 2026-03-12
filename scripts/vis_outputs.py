@@ -11,6 +11,7 @@ JSON_ROOT = os.path.join(project_root, "outputs")
 
 GLARE_DIR = os.path.join(JSON_ROOT, "glare")
 YUHENG_DIR = os.path.join(JSON_ROOT, "yuheng")
+YOLO_DIR = os.path.join(JSON_ROOT, "yolo")
 
 
 def load_json_data(subfolder, basename):
@@ -26,6 +27,17 @@ def load_json_data(subfolder, basename):
 
 def load_unified_prediction(basename):
     json_path = os.path.join(YUHENG_DIR, f"{basename}.json")
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return None
+    return None
+
+
+def load_yolo_prediction(basename):
+    json_path = os.path.join(YOLO_DIR, f"{basename}.json")
     if os.path.exists(json_path):
         try:
             with open(json_path, "r") as f:
@@ -128,6 +140,7 @@ def main():
         weather_data = load_json_data("weather", basename)
         cloud_data = load_json_data("cloud_detection", basename)
         unified = load_unified_prediction(basename)
+        yolo_data = load_yolo_prediction(basename)
 
         hud_lines = [f"FILE: {filename}", "-" * 30]
 
@@ -167,6 +180,20 @@ def main():
 
         else:
             hud_lines.append("ODD MODEL: No Data")
+
+        # -------- YOLO Traffic --------
+        if yolo_data:
+
+            car = yolo_data.get("car_density", 0)
+            ped = yolo_data.get("pedestrian_density", 0)
+            bike = yolo_data.get("bicycle_density", 0)
+            wz = yolo_data.get("work_zone", False)
+
+            hud_lines.append(f"TRAFFIC: Car {car:.3f} Ped {ped:.3f} Bike {bike:.3f}")
+            hud_lines.append(f"WORK ZONE: {wz}")
+
+        else:
+            hud_lines.append("TRAFFIC: No Data")
 
         # -------- Clouds --------
         if cloud_data and "cloud_fraction" in cloud_data:
