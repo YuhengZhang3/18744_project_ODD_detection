@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import os
 from typing import Dict, Any, Union, List
 from typing import Optional
 import json
@@ -72,7 +73,7 @@ class TrafficWorkzoneAnalyzer:
         if not image_path.exists():
             raise FileNotFoundError(f"image not found at {image_path}")
 
-        results = self.yolo_model.predict(source=str(image_path), save=False, imgsz=self.imgsz)
+        results = self.yolo_model.predict(source=str(image_path), save=False, imgsz=self.imgsz, verbose=False)
 
         if not results:
             return {
@@ -176,7 +177,6 @@ class TrafficWorkzoneAnalyzer:
             total_workzone_area += (x2 - x1) * (y2 - y1)
         
         area_percentage = total_workzone_area / image_area
-        print(f"Percentage is {area_percentage}")
         # New Rule: If total workzone area exceeds 30% of image area, it's a workzone
         # I added this rule because we need ways to identify large fences that may only be one single instance
         if image_area > 0 and area_percentage >= 0.30:
@@ -199,33 +199,68 @@ class TrafficWorkzoneAnalyzer:
 
         return True
 
+def process_traffic_workzone(input_dir, json_dir, model_path, thresholds_path=None):
+    """
+    Evaluate all images in input_dir, save outputs in json_dir
+    """
+    os.makedirs(json_dir, exist_ok=True)
+    analyzer = TrafficWorkzoneAnalyzer(model_path=model_path, thresholds_path=thresholds_path)
+    
+    image_extensions = ('.jpg', '.jpeg', '.png')
+    image_paths = [p for p in Path(input_dir).iterdir() if p.suffix.lower() in image_extensions]
+    
+    for img_path in image_paths:
+        result = analyzer.analyze_image(str(img_path))
+        output = {
+            'car_density': result['traffic_density']['car'],
+            'pedestrian_density': result['traffic_density']['pedestrian'],
+            'bicycle_density': result['traffic_density']['bicycle'],
+            'work_zone': result['work_zone']
+        }
+        json_path = Path(json_dir) / (img_path.stem + '.json')
+        with open(json_path, 'w') as f:
+            json.dump(output, f, indent=2)
+
+
 # for local testing
 if __name__ == '__main__':
-    # Make sure you have a trained model at this path or adjust it
-    # For this example, I'll use a dummy path
-    # e.g., trained_model_path = "18744_project_ODD_detection/runs/detect/yolo/stage2/weights/best.pt"
-    # Ensure this path exists and points to your actual trained weights.
-    trained_model_path = Path("../runs/detect/yolo/stage2/weights/best.pt") 
+    import argparse
 
-    # Create a dummy best.pt for testing if it doesn't exist
-    if not trained_model_path.exists():
-        raise RuntimeError(f"{trained_model_path} does not exist, aborting.")
+    parser = argparse.ArgumentParser(description='Test TrafficWorkzoneAnalyzer on a folder of images.')
+    parser.add_argument('--input_dir', type=str, required=True,
+                        help='Directory containing input images')
+    parser.add_argument('--model_path', type=str,
+                        default='../runs/detect/yolo/stage2/weights/best.pt',
+                        help='Path to trained YOLO model weights')
+    parser.add_argument('--thresholds', type=str, default=None,
+                        help='Path to density thresholds JSON file (optional)')
+    parser.add_argument('--output_dir', type=str, default='./traffic_output',
+                        help='Directory to save output JSON files (default: ./traffic_output)')
+    args = parser.parse_args()
 
-    analyzer = TrafficWorkzoneAnalyzer(model_path=trained_model_path, device='cuda')
+    # Resolve paths
+    model_path = Path(args.model_path).resolve()
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model not found: {model_path}")
 
-    # Some image for testing
-    dummy_image_path = Path("/teamspace/studios/this_studio/18744_project_ODD_detection/data/roadwork/images/boston_c106556774bd4c138ec4efffee79dd33_000001_17760_0080.jpg")
-    if not dummy_image_path.exists():
-        raise RuntimeError(f"{dummy_image_path} does not exist, aborting.")
+    input_dir = Path(args.input_dir).resolve()
+    if not input_dir.is_dir():
+        raise NotADirectoryError(f"Input directory not found: {input_dir}")
 
-    # Analyze the dummy image
-    try:
-        analysis_results = analyzer.analyze_image(dummy_image_path)
-        print("\nanalysis results:")
-        print(analysis_results)
-    except Exception as e:
-        print(f"error during analysis: {e}")
-        print("note: if you're getting an error about the model not being found or predict not working,")
-        print("please ensure 'runs/detect/yolo/stage2/weights/best.pt' points to a valid trained YOLO model,")
-        print("or use a valid pretrained model like 'yolov8n.pt' for testing purposes, if you didn't train one.")
-        print("you might also need to mock the ultralytics YOLO class if you don't have a real model available locally.")
+    output_dir = Path(args.output_dir).resolve()
+    thresholds_path = Path(args.thresholds).resolve() if args.thresholds else None
+
+    print(f"Processing images in {input_dir}")
+    print(f"Using model: {model_path}")
+    print(f"Output directory: {output_dir}")
+    if thresholds_path:
+        print(f"Thresholds file: {thresholds_path}")
+
+    process_traffic_workzone(
+        input_dir=str(input_dir),
+        json_dir=str(output_dir),
+        model_path=str(model_path),
+        thresholds_path=str(thresholds_path) if thresholds_path else None
+    )
+
+    print("Processing complete.")
