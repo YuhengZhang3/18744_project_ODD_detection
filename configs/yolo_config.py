@@ -11,18 +11,21 @@ yolo_config = {
 
     # -------------------- Training hyperparameters --------------------
     'batch': 16,                           # Batch size per GPU (adjust based on GPU memory)
+    # 'batch': 64,
     'imgsz': 640,                          # Input image size (standard for YOLOv8)
-    'workers': 8,                           # Number of dataloader workers
+    'workers': 12,                           # Number of dataloader workers
 
     # Stage 1: Freeze backbone
     'stage1_epochs': 15,                    # Number of epochs for frozen stage
     'freeze': 10,                            # Freeze first 10 layers (backbone)
     'lr0_stage1': 0.001,                     # Initial learning rate (typical for fine-tuning)
+    # 'lr0_stage1': 0.004, 
     'stage1_name': 'yolo/stage1',                  # Experiment subfolder name
 
     # Stage 2: Full fine-tuning
-    'stage2_epochs': 15,                     # Additional epochs for full fine-tuning
+    'stage2_epochs': 30,                     # Additional epochs for full fine-tuning
     'lr0_stage2': 0.0001,                     # Lower learning rate for fine-tuning
+    # 'lr0_stage2': 0.0004,
     'stage2_name': 'yolo/stage2',                  # Experiment subfolder name
 
     # Common optimizer settings

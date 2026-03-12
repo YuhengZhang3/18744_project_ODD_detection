@@ -7,8 +7,10 @@ Performs two-stage fine-tuning: first freeze backbone, then full network.
 import argparse
 import sys
 from pathlib import Path
+import re
 from models.yolo_model import YOLOModel
 from configs.yolo_config import yolo_config
+from typing import Optional
 
 
 project_root = Path(__file__).parent
@@ -21,6 +23,34 @@ def parse_args():
                         help='If set, run only stage2 using stage1/best.pt weights (must exist).')
     return parser.parse_args()
 
+def find_latest_run_dir(base_path: Path, experiment_name: str) -> Optional[Path]:
+    """
+    Finds the latest run directory for a given experiment name.
+    Handles cases like 'exp_name', 'exp_name2', 'exp_name3'.
+    """
+    parent_dir = base_path.parent
+    if not parent_dir.is_dir():
+        return None
+
+    # Regex to match 'experiment_name' or 'experiment_name#'
+    pattern = re.compile(rf"^{re.escape(experiment_name)}(\d*)$")
+    
+    matching_dirs = []
+    for d in parent_dir.iterdir():
+        if d.is_dir():
+            match = pattern.match(d.name)
+            if match:
+                suffix = match.group(1)
+                num = int(suffix) if suffix else 0
+                matching_dirs.append((num, d))
+    
+    if not matching_dirs:
+        return None
+    
+    # Sort by number and return the path of the highest one
+    latest_dir = sorted(matching_dirs, key=lambda x: x[0], reverse=True)[0][1]
+    return latest_dir
+
 
 def main():
     args = parse_args()
@@ -29,13 +59,24 @@ def main():
     for key, value in yolo_config.items():
         print(f"  {key}: {value}")
 
+    base_project_dir = Path(yolo_config.get('project') or 'runs/detect') # Default to runs/detect if project is None
+    stage1_base_name = yolo_config.get('stage1_name', 'yolo/stage1')
+    stage1_full_base_path = base_project_dir / stage1_base_name # This is the "project/name" part passed to YOLO
+
     if args.stage2only:
         # ---------- Stage 2 only: load weights directly ----------
-        # When project=None, default base is 'runs/detect'
-        weights_path = Path('runs/detect') / yolo_config.get('stage1_name', 'stage1') / 'weights' / 'best.pt'
-        if not weights_path.exists():
-            print(f"Error: Weights file not found: {weights_path}")
+        # Find the actual latest output directory for stage 1
+        latest_stage1_run_dir = find_latest_run_dir(stage1_full_base_path, stage1_full_base_path.name)
+        
+        if not latest_stage1_run_dir:
+            print(f"Error: No completed Stage 1 run found at {stage1_full_base_path.parent / stage1_full_base_path.name}* to resume from.")
             sys.exit(1)
+            
+        weights_path = latest_stage1_run_dir / 'weights' / 'best.pt'
+        if not weights_path.exists():
+            print(f"Error: Weights file not found in the latest stage 1 run: {weights_path}")
+            sys.exit(1)
+            
         print(f"\n=== Stage 2 only: loading weights from {weights_path} ===")
         model = YOLOModel(model_name=str(weights_path), device=yolo_config.get('device', 'cuda'))
     else:
@@ -45,22 +86,22 @@ def main():
             model_name=yolo_config.get('model_name', 'yolov8m.pt'),
             device=yolo_config.get('device', 'cuda')
         )
-        model.train(
+        stage1_save_dir = model.train( # Capture the actual save directory
             data=yolo_config['data'],
             epochs=yolo_config.get('stage1_epochs', 30),
             batch=yolo_config['batch'],
             imgsz=yolo_config['imgsz'],
             freeze=yolo_config.get('freeze', 10),
             lr0=yolo_config.get('lr0_stage1', 0.001),
-            project=yolo_config['project'],  # None
-            name=yolo_config.get('stage1_name', 'stage1'),
+            project=yolo_config['project'],
+            name=stage1_full_base_path.name, # Pass only the name part
             workers=yolo_config.get('workers', 8),
             optimizer=yolo_config.get('optimizer', 'SGD'),
             seed=yolo_config.get('seed', 42)
         )
 
-        # Prepare stage2 weights path from stage1 result (actual location)
-        weights_path = Path('runs/detect') / yolo_config.get('stage1_name', 'stage1') / 'weights' / 'best.pt'
+        # Use the captured save_dir to construct the path for stage 2
+        weights_path = stage1_save_dir / 'weights' / 'best.pt'
         if not weights_path.exists():
             raise RuntimeError(f"Error: Stage1 best weights not found at {weights_path}. Cannot proceed to stage 2.")
         print(f"\n=== Stage 2: Full fine-tuning, loading weights from {weights_path} ===")
@@ -74,8 +115,8 @@ def main():
         imgsz=yolo_config['imgsz'],
         freeze=0,  # unfreeze all layers
         lr0=yolo_config.get('lr0_stage2', 0.0001),
-        project=yolo_config['project'],  # None
-        name=yolo_config.get('stage2_name', 'stage2'),
+        project=yolo_config['project'],
+        name=yolo_config.get('stage2_name', 'yolo/stage2'), # YOLO will handle its numbering if already exists
         workers=yolo_config.get('workers', 8),
         optimizer=yolo_config.get('optimizer', 'SGD'),
         seed=yolo_config.get('seed', 42),

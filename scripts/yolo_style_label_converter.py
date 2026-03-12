@@ -101,11 +101,16 @@ class BaseConverter(ABC):
                     continue
                 yolo_lines.append(f"{target_id} {x_center:.6f} {y_center:.6f} {nw:.6f} {nh:.6f}")
 
-            # Write label file
+            # Write label file (always create, even if empty)
+            label_path = self.label_out_dir / f"{image_id}.txt"
             if yolo_lines:
-                label_path = self.label_out_dir / f"{image_id}.txt"
                 with open(label_path, 'w') as f:
                     f.write("\n".join(yolo_lines))
+            else:
+                # Create empty label file and notify
+                with open(label_path, 'w') as f:
+                    pass
+                print(f"Image {image_id} has no valid objects, empty label file created.")
 
             # Handle image (copy or symlink)
             dst_img_path = self.img_out_dir / f"{image_id}{self.image_ext}"
@@ -114,7 +119,6 @@ class BaseConverter(ABC):
                     os.symlink(src_img_path, dst_img_path)
             else:
                 shutil.copy2(src_img_path, dst_img_path)
-
 
 class RoadWorkConverter(BaseConverter):
     """
@@ -211,9 +215,9 @@ class BDDConverter(BaseConverter):
     # Based on discussion: person, rider -> 0; bicycle, motorcycle -> 1; car, truck, bus -> 2.
     CATEGORY_MAP = {
         "person": 0,
-        "rider": 0,
-        "bicycle": 1,
-        "motorcycle": 1,
+        "rider": 0, # need double check, should rider be considered? 
+        "bike": 1,
+        "motor": 1,
         "car": 2,
         "truck": 2,
         "bus": 2,

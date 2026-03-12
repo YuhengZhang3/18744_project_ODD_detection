@@ -142,8 +142,7 @@ def main():
             stem = label_path.stem  # image id without extension
             img_path = ROADWORK_IMG_DIR / f"{stem}.jpg"
             if not img_path.exists():
-                # print(f"Warning: Image {img_path} not found, skipping.")
-                continue
+                raise RuntimeError(f"Warning: Image {img_path} not found, aborting.")
             
             print(f"Generating pseudolabels for {img_path}")
 

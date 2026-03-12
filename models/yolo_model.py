@@ -20,7 +20,7 @@ class YOLOModel:
     def train(self, data: str, epochs: int, batch: int = 16, imgsz: int = 640,
               freeze: Optional[int] = None, lr0: float = 0.001, 
               project: str = 'runs/train', name: str = 'exp', 
-              resume: bool = False, **kwargs) -> None:
+              resume: bool = False, **kwargs) -> Path: # Modified return type to Path
         """
         Args:
             data (str): path of dataset configuration file data.yaml。
@@ -33,6 +33,9 @@ class YOLOModel:
             name (str)
             resume (bool): whether to resume from last checkpoint
             **kwargs: other hyperparams supported byu Ultralytics
+        
+        Returns:
+            Path: The directory where the training results were saved.
         """
 
         train_args = {
@@ -51,7 +54,8 @@ class YOLOModel:
         if freeze is not None:
             train_args['freeze'] = freeze
         
-        self.model.train(**train_args)
+        trainer = self.model.train(**train_args)
+        return Path(trainer.save_dir) # Return the actual save directory
     
     def predict(self, source: Union[str, Path, List[str]], conf: float = 0.25, 
                 iou: float = 0.45, imgsz: int = 640, save: bool = False, 
