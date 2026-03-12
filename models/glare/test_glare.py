@@ -62,7 +62,7 @@ def evaluate_test_set(model_dir="custom_glare_model", test_dir="../../source_ima
 
         # 6. Save the result
         filename = os.path.basename(img_path)
-        output_filename = os.path.join(output_dir, f"pred_{filename}")
+        output_filename = os.path.join(output_dir, f"{filename}")
         cv2.imwrite(output_filename, result)
         print(f"Processed and saved: {output_filename}")
 

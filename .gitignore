@@ -19,3 +19,4 @@ data/*.jsonl
 outputs/
 checkpoints/
 source_images/
+output_json/

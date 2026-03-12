@@ -8,6 +8,8 @@ from transformers import SegformerForSemanticSegmentation
 from torch.optim import AdamW
 from tqdm import tqdm
 
+# TRAINING NEEDED (clone https://github.com/maesfahani/glaredetection into THIS directory)
+
 # --- 1. Custom Dataset Loader (Unchanged) ---
 class GlareDataset(Dataset):
     def __init__(self, root_dir="glaredetection/RGB", img_size=(512, 512)):

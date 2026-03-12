@@ -7,6 +7,8 @@ import glob
 from torch import nn
 from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
 
+## NO TRAINING NEEDED
+
 def process_clouds(input_dir="../../source_images", output_dir="output_boxes", json_dir="output_json"):
     # 1. Setup directories
     os.makedirs(output_dir, exist_ok=True)

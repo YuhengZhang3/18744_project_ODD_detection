@@ -88,7 +88,7 @@ def predict_weather(input_dir="../../source_images", json_dir="output_json", mod
                 "weather": weather_metrics
             }
             
-            # Overwrite the file completely
+            # Save outputs
             with open(json_path, 'w') as f:
                 json.dump(output_data, f, indent=4)
                 
