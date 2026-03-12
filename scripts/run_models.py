@@ -7,10 +7,10 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
 # Import your model functions
-# from models.cloud_detection.clouds import process_clouds
-# from models.glare.test_glare import evaluate_test_set
-# from models.precip_model.infer import predict_weather
-# from models.yuheng.run_predictions import run_predictions
+from models.cloud_detection.clouds import process_clouds
+from models.glare.test_glare import evaluate_test_set
+from models.precip_model.infer import predict_weather
+from models.yuheng.run_predictions import run_predictions
 from models.yolo.traffic_workzone import process_traffic_workzone
 
 def run_pipeline():
@@ -24,56 +24,56 @@ def run_pipeline():
     print("========================================")
 
     # ---------------------------------------------------------
-    # # 1. CLOUD DETECTION
-    # # ---------------------------------------------------------
-    # print("\n[1/5] Running Cloud Detection...")
-    # cloud_output_dir = os.path.join(OUTPUT_JSON, "cloud_detection")
+    # 1. CLOUD DETECTION
+    # ---------------------------------------------------------
+    print("\n[1/5] Running Cloud Detection...")
+    cloud_output_dir = os.path.join(OUTPUT_JSON, "cloud_detection")
 
-    # process_clouds(
-    #     input_dir=INPUT_IMAGES,
-    #     output_dir=OUTPUT_BOXES,
-    #     json_dir=cloud_output_dir
-    # )
+    process_clouds(
+        input_dir=INPUT_IMAGES,
+        output_dir=OUTPUT_BOXES,
+        json_dir=cloud_output_dir
+    )
 
-    # # ---------------------------------------------------------
-    # # 2. GLARE EVALUATION
-    # # ---------------------------------------------------------
-    # print("\n[2/5] Running Glare Evaluation...")
-    # glare_model = os.path.join(project_root, "models", "glare", "custom_glare_model")
-    # glare_output_dir = os.path.join(OUTPUT_JSON, "glare")
+    # ---------------------------------------------------------
+    # 2. GLARE EVALUATION
+    # ---------------------------------------------------------
+    print("\n[2/5] Running Glare Evaluation...")
+    glare_model = os.path.join(project_root, "models", "glare", "custom_glare_model")
+    glare_output_dir = os.path.join(OUTPUT_JSON, "glare")
     
-    # evaluate_test_set(
-    #     model_dir=glare_model,
-    #     test_dir=INPUT_IMAGES,
-    #     output_dir=glare_output_dir
-    # )
+    evaluate_test_set(
+        model_dir=glare_model,
+        test_dir=INPUT_IMAGES,
+        output_dir=glare_output_dir
+    )
 
-    # # ---------------------------------------------------------
-    # # 3. WEATHER PREDICTION
-    # # ---------------------------------------------------------
-    # print("\n[3/5] Running Weather Prediction...")
-    # weather_weights = os.path.join(project_root, "models", "precip_model", "weather_resnet18_best.pth")
-    # weather_output_dir = os.path.join(OUTPUT_JSON, "weather")
+    # ---------------------------------------------------------
+    # 3. WEATHER PREDICTION
+    # ---------------------------------------------------------
+    print("\n[3/5] Running Weather Prediction...")
+    weather_weights = os.path.join(project_root, "models", "precip_model", "weather_resnet18_best.pth")
+    weather_output_dir = os.path.join(OUTPUT_JSON, "weather")
     
-    # predict_weather(
-    #     input_dir=INPUT_IMAGES,
-    #     json_dir=weather_output_dir,
-    #     model_path=weather_weights
-    # )
+    predict_weather(
+        input_dir=INPUT_IMAGES,
+        json_dir=weather_output_dir,
+        model_path=weather_weights
+    )
     
-    # # ---------------------------------------------------------
-    # # 4. BDD100k EVALUATION
-    # # ---------------------------------------------------------
-    # print("\n[4/5] Running BDD100k Evaluation...")
-    # yuheng_output_dir = os.path.join(OUTPUT_JSON, "yuheng")
+    # ---------------------------------------------------------
+    # 4. BDD100k EVALUATION
+    # ---------------------------------------------------------
+    print("\n[4/5] Running BDD100k Evaluation...")
+    yuheng_output_dir = os.path.join(OUTPUT_JSON, "yuheng")
     
-    # run_predictions(
-    #     source_directory=INPUT_IMAGES,
-    #     output_json_directory=yuheng_output_dir,
-    #     checkpoint_path="models/yuheng/stage2_best.pt",
-    #     drivable_label_directory=None,
-    #     limit=None
-    # )
+    run_predictions(
+        source_directory=INPUT_IMAGES,
+        output_json_directory=yuheng_output_dir,
+        checkpoint_path="models/yuheng/stage2_best.pt",
+        drivable_label_directory=None,
+        limit=None
+    )
     
     # ---------------------------------------------------------
     # 5. YOLO
