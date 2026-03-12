@@ -10,7 +10,7 @@ sys.path.insert(0, project_root)
 from models.cloud_detection.clouds import process_clouds
 from models.glare.test_glare import evaluate_test_set
 from models.precip_model.infer import predict_weather
-from models.visibility.label_visibility_bdd import predict_visibility
+from models.yuheng.run_predictions import run_predictions
 
 def run_pipeline():
     # Define your shared paths here so they are easy to update
@@ -25,7 +25,7 @@ def run_pipeline():
     # ---------------------------------------------------------
     # 1. CLOUD DETECTION
     # ---------------------------------------------------------
-    print("\n[1/4] Running Cloud Detection...")
+    print("\n[1/5] Running Cloud Detection...")
     cloud_output_dir = os.path.join(OUTPUT_JSON, "cloud_detection")
 
     process_clouds(
@@ -37,7 +37,7 @@ def run_pipeline():
     # ---------------------------------------------------------
     # 2. GLARE EVALUATION
     # ---------------------------------------------------------
-    print("\n[2/4] Running Glare Evaluation...")
+    print("\n[2/5] Running Glare Evaluation...")
     glare_model = os.path.join(project_root, "models", "glare", "custom_glare_model")
     glare_output_dir = os.path.join(OUTPUT_JSON, "glare")
     
@@ -50,7 +50,7 @@ def run_pipeline():
     # ---------------------------------------------------------
     # 3. WEATHER PREDICTION
     # ---------------------------------------------------------
-    print("\n[3/4] Running Weather Prediction...")
+    print("\n[3/5] Running Weather Prediction...")
     weather_weights = os.path.join(project_root, "models", "precip_model", "weather_resnet18_best.pth")
     weather_output_dir = os.path.join(OUTPUT_JSON, "weather")
     
@@ -59,16 +59,19 @@ def run_pipeline():
         json_dir=weather_output_dir,
         model_path=weather_weights
     )
-
-    # ---------------------------------------------------------
-    # 4. VISIBILITY EVALUATION
-    # ---------------------------------------------------------
-    print("\n[4/4] Running Visibility Evaluation...")
-    visibility_output_dir = os.path.join(OUTPUT_JSON, "visibility")
     
-    predict_visibility(
-        input_dir=INPUT_IMAGES,
-        json_dir=visibility_output_dir
+    # ---------------------------------------------------------
+    # 4. BDD100k EVALUATION
+    # ---------------------------------------------------------
+    print("\n[4/5] Running BDD100k Evaluation...")
+    yuheng_output_dir = os.path.join(OUTPUT_JSON, "yuheng")
+    
+    run_predictions(
+        source_directory=INPUT_IMAGES,
+        output_json_directory=yuheng_output_dir,
+        checkpoint_path="models/yuheng/stage2_best.pt",
+        drivable_label_directory=None,
+        limit=None
     )
 
     print("\n========================================")

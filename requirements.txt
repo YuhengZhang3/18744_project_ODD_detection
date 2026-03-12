@@ -1,6 +1,3 @@
-# Placeholder for Python dependencies (e.g., torch, torchvision, dinov2, etc.)
-
-
 # cloud detection
 transformers
 torch
