@@ -1,6 +1,3 @@
-import math
-from collections import Counter
-
 import torch
 from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 
@@ -136,22 +133,29 @@ def counter_to_class_weights(counter, num_classes, min_count=1):
 
 
 def build_sample_weights_from_targets(targets, num_classes):
-    counter = Counter(targets)
+    counter = {}
+    for y in targets:
+        y = int(y)
+        counter[y] = counter.get(y, 0) + 1
+
     class_weights = counter_to_class_weights(counter, num_classes)
-    sample_weights = torch.tensor([class_weights[int(y)].item() for y in targets], dtype=torch.double)
+    sample_weights = torch.tensor(
+        [class_weights[int(y)].item() for y in targets],
+        dtype=torch.double,
+    )
     return sample_weights, class_weights
 
 
 def maybe_make_weighted_sampler(targets, num_classes, enable):
     if not enable:
-        return None, None
-    sample_weights, class_weights = build_sample_weights_from_targets(targets, num_classes)
+        return None
+    sample_weights, _ = build_sample_weights_from_targets(targets, num_classes)
     sampler = WeightedRandomSampler(
         weights=sample_weights,
         num_samples=len(sample_weights),
         replacement=True,
     )
-    return sampler, class_weights
+    return sampler
 
 
 def build_v2_datasets(bdd_root, rscd_root, seed=42, road_val_ratio=0.1):
@@ -200,22 +204,25 @@ def build_v2_loaders(
     use_balanced_visibility=False,
     use_balanced_road=False,
 ):
-    ts_train_targets_scene = datasets["ts_train"].targets_scene
-    vis_train_targets = datasets["vis_train"].targets
-
-    road_train_targets = [datasets["road_train"][i][1].item() for i in range(len(datasets["road_train"]))]
-
-    scene_sampler, scene_class_weights = maybe_make_weighted_sampler(
-        ts_train_targets_scene,
+    scene_sampler = maybe_make_weighted_sampler(
+        datasets["ts_train"].targets_scene,
         num_classes=7,
         enable=use_balanced_scene,
     )
-    vis_sampler, vis_class_weights = maybe_make_weighted_sampler(
-        vis_train_targets,
+
+    vis_sampler = maybe_make_weighted_sampler(
+        datasets["vis_train"].targets,
         num_classes=3,
         enable=use_balanced_visibility,
     )
-    road_sampler, road_class_weights = maybe_make_weighted_sampler(
+
+    if hasattr(datasets["road_train"], "indices") and hasattr(datasets["road_train"], "dataset"):
+        base_targets = datasets["road_train"].dataset.targets
+        road_train_targets = [base_targets[i] for i in datasets["road_train"].indices]
+    else:
+        road_train_targets = [datasets["road_train"][i][1].item() for i in range(len(datasets["road_train"]))]
+
+    road_sampler = maybe_make_weighted_sampler(
         road_train_targets,
         num_classes=27,
         enable=use_balanced_road,
@@ -293,7 +300,4 @@ def build_v2_loaders(
         "val_drv": val_loader_drv,
         "train_road": train_loader_road,
         "val_road": val_loader_road,
-        "scene_class_weights": scene_class_weights,
-        "visibility_class_weights": vis_class_weights,
-        "road_class_weights": road_class_weights,
     }

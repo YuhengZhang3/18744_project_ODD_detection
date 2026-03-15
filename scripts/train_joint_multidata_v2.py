@@ -29,6 +29,12 @@ from utils.multitask_train import (
     build_v2_pattern,
     compute_steps_per_epoch,
 )
+from configs.data_stats import (
+    BDD_SCENE_TRAIN_COUNTS,
+    BDD_VISIBILITY_TRAIN_COUNTS,
+    RSCD_ROAD_TRAIN_COUNTS,
+    BDD_DRIVABLE_PIXEL_COUNTS,
+)
 
 
 def main():
@@ -126,27 +132,16 @@ def main():
     drivable_class_weights = None
 
     if args.use_class_weights_scene:
-        scene_class_weights = counter_to_class_weights(
-            datasets["ts_train"].get_class_counts()["scene"],
-            num_classes=7,
-        )
+        scene_class_weights = counter_to_class_weights(BDD_SCENE_TRAIN_COUNTS, num_classes=7)
+
     if args.use_class_weights_visibility:
-        visibility_class_weights = counter_to_class_weights(
-            datasets["vis_train"].get_class_counts(),
-            num_classes=3,
-        )
+        visibility_class_weights = counter_to_class_weights(BDD_VISIBILITY_TRAIN_COUNTS, num_classes=3)
+
     if args.use_class_weights_road:
-        road_class_weights = counter_to_class_weights(
-            loaders["road_class_weights"] if loaders["road_class_weights"] is not None else datasets["road_train"].dataset.get_class_counts() if hasattr(datasets["road_train"], "dataset") else {},
-            num_classes=27,
-        )
+        road_class_weights = counter_to_class_weights(RSCD_ROAD_TRAIN_COUNTS, num_classes=27)
 
     if args.use_class_weights_drivable:
-        drv_pixel_counts = datasets["drv_train"].get_pixel_counts()
-        drivable_class_weights = counter_to_class_weights(
-            drv_pixel_counts,
-            num_classes=3,
-        )
+        drivable_class_weights = counter_to_class_weights(BDD_DRIVABLE_PIXEL_COUNTS, num_classes=3)
 
     pattern = build_v2_pattern(
         args.ts_ratio,
@@ -245,7 +240,7 @@ def main():
             outputs = model(batch["images"])
 
             if is_main_task:
-                main_loss, loss_stats = compute_main_multitask_loss(
+                main_loss, _ = compute_main_multitask_loss(
                     outputs=outputs,
                     batch=batch,
                     scene_class_weights=scene_class_weights,
@@ -316,7 +311,6 @@ def main():
         val_road_acc = eval_multiclass_head(model, loaders["val_road"], device, "road_condition", "road_condition")
         val_drv_iou = eval_drivable_iou(model, loaders["val_drv"], device)
 
-        # main score does not include drivable, since drivable is auxiliary
         score = (
             0.25 * val_time_acc
             + 0.25 * val_scene_acc
