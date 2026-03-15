@@ -1,17 +1,30 @@
-import torch
-from torch.utils.data import DataLoader, random_split
+import math
+from collections import Counter
 
-from data.bdd_dataset import BDDDTimeScene, BDDDVisibility, collate_time_scene
+import torch
+from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
+
+from data.bdd_dataset import (
+    BDDDTimeScene,
+    BDDDVisibility,
+    BDDDDrivable,
+    collate_time_scene,
+    collate_drivable,
+    get_bdd_root,
+    resolve_img_root_for_split,
+    resolve_label_root_for_split,
+)
 from data.rscd_dataset import RSCDRoadCondition
 
 
-ALL_HEADS = ["time", "scene", "visibility", "road_condition"]
+ALL_HEADS = ["time", "scene", "visibility", "road_condition", "drivable"]
 
 
 def collate_visibility(batch):
     imgs = torch.stack([x[0] for x in batch], dim=0)
     labels = torch.stack([x[1] for x in batch], dim=0)
     bsz = labels.shape[0]
+
     return {
         "images": imgs,
         "labels": {
@@ -30,6 +43,7 @@ def collate_road_condition(batch):
     imgs = torch.stack([x[0] for x in batch], dim=0)
     labels = torch.stack([x[1] for x in batch], dim=0)
     bsz = labels.shape[0]
+
     return {
         "images": imgs,
         "labels": {
@@ -44,11 +58,19 @@ def collate_road_condition(batch):
     }
 
 
-def make_loader(dataset, batch_size, shuffle, num_workers, collate_fn=None):
+def make_loader(
+    dataset,
+    batch_size,
+    shuffle,
+    num_workers,
+    collate_fn=None,
+    sampler=None,
+):
     return DataLoader(
         dataset,
         batch_size=batch_size,
-        shuffle=shuffle,
+        shuffle=(shuffle if sampler is None else False),
+        sampler=sampler,
         num_workers=num_workers,
         pin_memory=True,
         collate_fn=collate_fn,
@@ -64,9 +86,11 @@ def cycle_loader(loader):
 
 def move_batch_to_device(batch, device):
     batch["images"] = batch["images"].to(device, non_blocking=True)
+
     for group in ["labels", "mask", "severity"]:
         for k in batch[group]:
             batch[group][k] = batch[group][k].to(device, non_blocking=True)
+
     return batch
 
 
@@ -76,27 +100,78 @@ def fill_missing_heads(batch):
 
     for name in ALL_HEADS:
         if name not in batch["labels"]:
-            batch["labels"][name] = torch.zeros(bsz, dtype=torch.long, device=device)
+            if name == "drivable":
+                batch["labels"][name] = torch.zeros(
+                    (bsz, 336, 336), dtype=torch.long, device=device
+                )
+            else:
+                batch["labels"][name] = torch.zeros(
+                    bsz, dtype=torch.long, device=device
+                )
+
         if name not in batch["mask"]:
-            batch["mask"][name] = torch.zeros(bsz, dtype=torch.float32, device=device)
+            batch["mask"][name] = torch.zeros(
+                bsz, dtype=torch.float32, device=device
+            )
+
         if name not in batch["severity"]:
-            batch["severity"][name] = torch.ones(bsz, dtype=torch.float32, device=device)
+            batch["severity"][name] = torch.ones(
+                bsz, dtype=torch.float32, device=device
+            )
 
     return batch
 
 
-def build_multitask_datasets(bdd_root, rscd_root, seed=42, road_val_ratio=0.1):
+def counter_to_class_weights(counter, num_classes, min_count=1):
+    total = sum(counter.values())
+    weights = []
+    for i in range(num_classes):
+        cnt = max(counter.get(i, 0), min_count)
+        w = total / cnt
+        weights.append(w)
+
+    weights = torch.tensor(weights, dtype=torch.float32)
+    weights = weights / weights.mean()
+    return weights
+
+
+def build_sample_weights_from_targets(targets, num_classes):
+    counter = Counter(targets)
+    class_weights = counter_to_class_weights(counter, num_classes)
+    sample_weights = torch.tensor([class_weights[int(y)].item() for y in targets], dtype=torch.double)
+    return sample_weights, class_weights
+
+
+def maybe_make_weighted_sampler(targets, num_classes, enable):
+    if not enable:
+        return None, None
+    sample_weights, class_weights = build_sample_weights_from_targets(targets, num_classes)
+    sampler = WeightedRandomSampler(
+        weights=sample_weights,
+        num_samples=len(sample_weights),
+        replacement=True,
+    )
+    return sampler, class_weights
+
+
+def build_v2_datasets(bdd_root, rscd_root, seed=42, road_val_ratio=0.1):
+    if bdd_root is None:
+        bdd_root = get_bdd_root()
+
     ts_train = BDDDTimeScene(
-        img_root=f"{bdd_root}/100k_datasets/100k/train",
-        label_dir=f"{bdd_root}/100k_label/100k/train",
+        img_root=resolve_img_root_for_split(bdd_root, "train"),
+        label_dir=resolve_label_root_for_split(bdd_root, "train"),
     )
     ts_val = BDDDTimeScene(
-        img_root=f"{bdd_root}/100k_datasets/100k/val",
-        label_dir=f"{bdd_root}/100k_label/100k/val",
+        img_root=resolve_img_root_for_split(bdd_root, "val"),
+        label_dir=resolve_label_root_for_split(bdd_root, "val"),
     )
 
     vis_train = BDDDVisibility(split="train")
     vis_val = BDDDVisibility(split="val")
+
+    drv_train = BDDDDrivable(split="train")
+    drv_val = BDDDDrivable(split="val")
 
     road_full = RSCDRoadCondition(root=rscd_root, split="train")
     n = len(road_full)
@@ -110,31 +185,103 @@ def build_multitask_datasets(bdd_root, rscd_root, seed=42, road_val_ratio=0.1):
         "ts_val": ts_val,
         "vis_train": vis_train,
         "vis_val": vis_val,
+        "drv_train": drv_train,
+        "drv_val": drv_val,
         "road_train": road_train,
         "road_val": road_val,
     }
 
 
-def build_multitask_loaders(datasets, batch_size, num_workers):
+def build_v2_loaders(
+    datasets,
+    batch_size,
+    num_workers,
+    use_balanced_scene=False,
+    use_balanced_visibility=False,
+    use_balanced_road=False,
+):
+    ts_train_targets_scene = datasets["ts_train"].targets_scene
+    vis_train_targets = datasets["vis_train"].targets
+
+    road_train_targets = [datasets["road_train"][i][1].item() for i in range(len(datasets["road_train"]))]
+
+    scene_sampler, scene_class_weights = maybe_make_weighted_sampler(
+        ts_train_targets_scene,
+        num_classes=7,
+        enable=use_balanced_scene,
+    )
+    vis_sampler, vis_class_weights = maybe_make_weighted_sampler(
+        vis_train_targets,
+        num_classes=3,
+        enable=use_balanced_visibility,
+    )
+    road_sampler, road_class_weights = maybe_make_weighted_sampler(
+        road_train_targets,
+        num_classes=27,
+        enable=use_balanced_road,
+    )
+
     train_loader_ts = make_loader(
-        datasets["ts_train"], batch_size, True, num_workers, collate_time_scene
+        datasets["ts_train"],
+        batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        collate_fn=collate_time_scene,
+        sampler=scene_sampler,
     )
     val_loader_ts = make_loader(
-        datasets["ts_val"], batch_size, False, num_workers, collate_time_scene
+        datasets["ts_val"],
+        batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=collate_time_scene,
     )
 
     train_loader_vis = make_loader(
-        datasets["vis_train"], batch_size, True, num_workers, collate_visibility
+        datasets["vis_train"],
+        batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        collate_fn=collate_visibility,
+        sampler=vis_sampler,
     )
     val_loader_vis = make_loader(
-        datasets["vis_val"], batch_size, False, num_workers, collate_visibility
+        datasets["vis_val"],
+        batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=collate_visibility,
+    )
+
+    train_loader_drv = make_loader(
+        datasets["drv_train"],
+        batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        collate_fn=collate_drivable,
+    )
+    val_loader_drv = make_loader(
+        datasets["drv_val"],
+        batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=collate_drivable,
     )
 
     train_loader_road = make_loader(
-        datasets["road_train"], batch_size, True, num_workers, collate_road_condition
+        datasets["road_train"],
+        batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        collate_fn=collate_road_condition,
+        sampler=road_sampler,
     )
     val_loader_road = make_loader(
-        datasets["road_val"], batch_size, False, num_workers, collate_road_condition
+        datasets["road_val"],
+        batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=collate_road_condition,
     )
 
     return {
@@ -142,6 +289,11 @@ def build_multitask_loaders(datasets, batch_size, num_workers):
         "val_ts": val_loader_ts,
         "train_vis": train_loader_vis,
         "val_vis": val_loader_vis,
+        "train_drv": train_loader_drv,
+        "val_drv": val_loader_drv,
         "train_road": train_loader_road,
         "val_road": val_loader_road,
+        "scene_class_weights": scene_class_weights,
+        "visibility_class_weights": vis_class_weights,
+        "road_class_weights": road_class_weights,
     }
