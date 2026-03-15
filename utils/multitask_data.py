@@ -1,3 +1,5 @@
+import os
+import json
 import torch
 from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 
@@ -146,9 +148,15 @@ def build_sample_weights_from_targets(targets, num_classes):
     return sample_weights, class_weights
 
 
-def maybe_make_weighted_sampler(targets, num_classes, enable):
+def load_cached_targets(cache_path):
+    with open(cache_path, "r") as f:
+        return json.load(f)
+
+
+def maybe_make_weighted_sampler_from_cache(cache_path, num_classes, enable):
     if not enable:
         return None
+    targets = load_cached_targets(cache_path)
     sample_weights, _ = build_sample_weights_from_targets(targets, num_classes)
     sampler = WeightedRandomSampler(
         weights=sample_weights,
@@ -203,30 +211,33 @@ def build_v2_loaders(
     use_balanced_scene=False,
     use_balanced_visibility=False,
     use_balanced_road=False,
+    sampler_cache_dir="",
 ):
-    scene_sampler = maybe_make_weighted_sampler(
-        datasets["ts_train"].targets_scene,
-        num_classes=7,
-        enable=use_balanced_scene,
-    )
+    scene_sampler = None
+    vis_sampler = None
+    road_sampler = None
 
-    vis_sampler = maybe_make_weighted_sampler(
-        datasets["vis_train"].targets,
-        num_classes=3,
-        enable=use_balanced_visibility,
-    )
+    if sampler_cache_dir:
+        if use_balanced_scene:
+            scene_sampler = maybe_make_weighted_sampler_from_cache(
+                os.path.join(sampler_cache_dir, "bdd_train_scene_targets.json"),
+                num_classes=7,
+                enable=True,
+            )
 
-    if hasattr(datasets["road_train"], "indices") and hasattr(datasets["road_train"], "dataset"):
-        base_targets = datasets["road_train"].dataset.targets
-        road_train_targets = [base_targets[i] for i in datasets["road_train"].indices]
-    else:
-        road_train_targets = [datasets["road_train"][i][1].item() for i in range(len(datasets["road_train"]))]
+        if use_balanced_visibility:
+            vis_sampler = maybe_make_weighted_sampler_from_cache(
+                os.path.join(sampler_cache_dir, "bdd_train_visibility_targets.json"),
+                num_classes=3,
+                enable=True,
+            )
 
-    road_sampler = maybe_make_weighted_sampler(
-        road_train_targets,
-        num_classes=27,
-        enable=use_balanced_road,
-    )
+        if use_balanced_road:
+            road_sampler = maybe_make_weighted_sampler_from_cache(
+                os.path.join(sampler_cache_dir, "rscd_train_targets.json"),
+                num_classes=27,
+                enable=True,
+            )
 
     train_loader_ts = make_loader(
         datasets["ts_train"],

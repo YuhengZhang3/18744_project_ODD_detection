@@ -158,13 +158,16 @@ def compute_drivable_loss(outputs, batch, drivable_class_weights=None):
     return loss
 
 
-def eval_multiclass_head(model, loader, device, head_name, label_name):
+def eval_multiclass_head(model, loader, device, head_name, label_name, max_batches=0):
     model.eval()
     total = 0
     correct = 0
 
     with torch.no_grad():
-        for batch in loader:
+        for bi, batch in enumerate(loader):
+            if max_batches > 0 and bi >= max_batches:
+                break
+
             imgs = batch["images"].to(device, non_blocking=True)
             y = batch["labels"][label_name].to(device, non_blocking=True)
             out = model(imgs)
@@ -176,14 +179,17 @@ def eval_multiclass_head(model, loader, device, head_name, label_name):
     return correct / max(total, 1)
 
 
-def eval_drivable_iou(model, loader, device):
+def eval_drivable_iou(model, loader, device, max_batches=0):
     model.eval()
 
     inter = 0
     union = 0
 
     with torch.no_grad():
-        for batch in loader:
+        for bi, batch in enumerate(loader):
+            if max_batches > 0 and bi >= max_batches:
+                break
+
             imgs = batch["images"].to(device, non_blocking=True)
             y = batch["labels"]["drivable"].to(device, non_blocking=True)
 

@@ -93,19 +93,15 @@ def resolve_drivable_root_for_split(root, split):
 
 class BDDDTimeScene(Dataset):
     # bdd100k time + scene from per-image json files
+    # keep init light: do not preload all labels
 
     def __init__(self, img_root, label_dir, transform=None):
         self.img_root = img_root
         self.label_paths = sorted(glob(os.path.join(label_dir, "*.json")))
         self.transform = transform if transform is not None else get_default_transform()
 
-        self.targets_time = []
-        self.targets_scene = []
-
-        for p in self.label_paths:
-            t_str, s_str = self._load_attrs(p)
-            self.targets_time.append(TIME_MAP.get(t_str, TIME_MAP["undefined"]))
-            self.targets_scene.append(SCENE_MAP.get(s_str, SCENE_MAP["undefined"]))
+        self.targets_time = None
+        self.targets_scene = None
 
     def __len__(self):
         return len(self.label_paths)
@@ -118,12 +114,6 @@ class BDDDTimeScene(Dataset):
         s_str = attrs.get("scene", "undefined")
         return t_str, s_str
 
-    def get_class_counts(self):
-        return {
-            "time": Counter(self.targets_time),
-            "scene": Counter(self.targets_scene),
-        }
-
     def __getitem__(self, idx):
         label_path = self.label_paths[idx]
         base = os.path.splitext(os.path.basename(label_path))[0]
@@ -132,8 +122,9 @@ class BDDDTimeScene(Dataset):
         img = Image.open(img_path).convert("RGB")
         img = self.transform(img)
 
-        t_label = self.targets_time[idx]
-        s_label = self.targets_scene[idx]
+        t_str, s_str = self._load_attrs(label_path)
+        t_label = TIME_MAP.get(t_str, TIME_MAP["undefined"])
+        s_label = SCENE_MAP.get(s_str, SCENE_MAP["undefined"])
 
         labels = {
             "time": torch.tensor(t_label, dtype=torch.long),
@@ -180,6 +171,7 @@ def collate_time_scene(batch):
 
 class BDDDVisibility(Dataset):
     # visibility labels from *_vis.json
+    # keep init light: do not preload all labels
 
     def __init__(self, split, transform=None):
         self.bdd_root = get_bdd_root()
@@ -188,27 +180,10 @@ class BDDDVisibility(Dataset):
         self.transform = transform if transform is not None else get_default_transform()
 
         self.label_paths = sorted(glob(os.path.join(self.vis_root, "*_vis.json")))
-        self.targets = []
-
-        for p in self.label_paths:
-            with open(p, "r") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
-                if "visibility" in data:
-                    y = data["visibility"]
-                elif "label" in data:
-                    y = data["label"]
-                else:
-                    raise ValueError(f"unknown visibility label format: {p}")
-            else:
-                y = data
-            self.targets.append(int(y))
+        self.targets = None
 
     def __len__(self):
         return len(self.label_paths)
-
-    def get_class_counts(self):
-        return Counter(self.targets)
 
     def __getitem__(self, idx):
         label_path = self.label_paths[idx]
@@ -218,16 +193,32 @@ class BDDDVisibility(Dataset):
         img = Image.open(img_path).convert("RGB")
         img = self.transform(img)
 
-        label = torch.tensor(self.targets[idx], dtype=torch.long)
+        with open(label_path, "r") as f:
+            data = json.load(f)
+
+        if isinstance(data, dict):
+            if "visibility" in data:
+                y = data["visibility"]
+            elif "label" in data:
+                y = data["label"]
+            else:
+                raise ValueError(f"unknown visibility label format: {label_path}")
+        else:
+            y = data
+
+        label = torch.tensor(int(y), dtype=torch.long)
         return img, label
+
 
 
 class BDDDDrivable(Dataset):
     # drivable segmentation labels from bdd100k_drivable_maps/labels/{split}
     # returns image + segmentation mask for drivable head
+    # keep init light: do not scan all masks here
 
     def __init__(self, split, transform=None, mask_resize=True):
         assert split in {"train", "val"}
+        self.split = split
         self.bdd_root = get_bdd_root()
         self.img_root = resolve_img_root_for_split(self.bdd_root, split)
         self.mask_root = resolve_drivable_root_for_split(self.bdd_root, split)
@@ -236,38 +227,23 @@ class BDDDDrivable(Dataset):
         self.mask_resize = get_default_mask_resize() if mask_resize else None
 
         self.mask_paths = sorted(glob(os.path.join(self.mask_root, "*_drivable_id.png")))
-        self.targets = [0 for _ in self.mask_paths]  # placeholder for sampler compatibility
-
-        self.pixel_counter = Counter()
-        self.direct_ratios = []
-        self.alt_ratios = []
-        self.bg_ratios = []
-
-        for p in self.mask_paths:
-            arr = np.array(Image.open(p).convert("L"))
-            vals, counts = np.unique(arr, return_counts=True)
-            total = arr.size
-            per = {int(v): int(c) for v, c in zip(vals, counts)}
-
-            for k, v in per.items():
-                self.pixel_counter[k] += v
-
-            self.bg_ratios.append(per.get(0, 0) / total)
-            self.alt_ratios.append(per.get(1, 0) / total)
-            self.direct_ratios.append(per.get(2, 0) / total)
+        self.targets = [0 for _ in self.mask_paths]  # placeholder only
 
     def __len__(self):
         return len(self.mask_paths)
 
     def get_pixel_counts(self):
-        return Counter(self.pixel_counter)
+        # use cached stats instead of scanning masks every time
+        from configs.data_stats import BDD_DRIVABLE_PIXEL_COUNTS
+        return Counter(BDD_DRIVABLE_PIXEL_COUNTS)
 
     def get_mean_pixel_ratios(self):
-        n = max(len(self.mask_paths), 1)
+        counts = self.get_pixel_counts()
+        total = sum(counts.values())
         return {
-            "background": float(np.mean(self.bg_ratios)) if self.bg_ratios else 0.0,
-            "alternative_drivable": float(np.mean(self.alt_ratios)) if self.alt_ratios else 0.0,
-            "direct_drivable": float(np.mean(self.direct_ratios)) if self.direct_ratios else 0.0,
+            "background": counts.get(0, 0) / total if total > 0 else 0.0,
+            "alternative_drivable": counts.get(1, 0) / total if total > 0 else 0.0,
+            "direct_drivable": counts.get(2, 0) / total if total > 0 else 0.0,
         }
 
     def __getitem__(self, idx):
@@ -300,7 +276,6 @@ class BDDDDrivable(Dataset):
             "mask": batch_mask,
             "severity": severity,
         }
-
 
 def collate_drivable(batch):
     imgs = torch.stack([b["image"] for b in batch], dim=0)

@@ -50,6 +50,7 @@ def main():
     parser.add_argument("--rscd_root", type=str, default="/home/yuhengz3@andrew.cmu.edu/rscd/dataset")
     parser.add_argument("--save_dir", type=str, default="checkpoints_multitask_v2")
     parser.add_argument("--init_ckpt", type=str, default="")
+    parser.add_argument("--sampler_cache_dir", type=str, default="")
 
     parser.add_argument("--freeze_backbone", action="store_true")
 
@@ -77,13 +78,17 @@ def main():
     parser.add_argument("--use_class_weights_drivable", action="store_true")
 
     parser.add_argument("--max_train_steps_debug", type=int, default=0)
+    parser.add_argument("--eval_max_batches", type=int, default=0)
 
     args = parser.parse_args()
 
+    print("A. start")
     seed_everything(args.seed)
     ensure_dir(args.save_dir)
     device = get_device()
+    print("A1. device ready:", device)
 
+    print("B. before build_v2_datasets")
     datasets = build_v2_datasets(
         bdd_root=args.bdd_root,
         rscd_root=args.rscd_root,
@@ -91,6 +96,8 @@ def main():
         road_val_ratio=0.1,
     )
 
+    print("C. after build_v2_datasets")
+    print("D. before build_v2_loaders")
     loaders = build_v2_loaders(
         datasets=datasets,
         batch_size=args.batch_size,
@@ -98,9 +105,13 @@ def main():
         use_balanced_scene=args.use_balanced_scene,
         use_balanced_visibility=args.use_balanced_visibility,
         use_balanced_road=args.use_balanced_road,
+        sampler_cache_dir=args.sampler_cache_dir,
     )
 
+    print("E. after build_v2_loaders")
+    print("F. before build model")
     model = ODDModel(freeze_backbone=False).to(device)
+    print("G. after build model")
 
     if args.freeze_backbone:
         model.backbone.freeze_backbone()
@@ -111,6 +122,7 @@ def main():
         print("missing keys:", missing)
         print("unexpected keys:", unexpected)
 
+    print("H. before build optimizers")
     main_param_groups, drv_param_groups = build_v2_param_groups(
         model,
         lr_backbone=args.lr_backbone,
@@ -125,6 +137,7 @@ def main():
 
     sched_main = torch.optim.lr_scheduler.CosineAnnealingLR(opt_main, T_max=args.epochs)
     sched_drv = torch.optim.lr_scheduler.CosineAnnealingLR(opt_drv, T_max=args.epochs)
+    print("I. after build optimizers")
 
     scene_class_weights = None
     visibility_class_weights = None
@@ -189,6 +202,7 @@ def main():
         "road=", len(datasets["road_val"]),
     )
 
+    print("J. before training loop")
     for epoch in range(1, args.epochs + 1):
         model.train()
         t0 = time.time()
@@ -305,11 +319,21 @@ def main():
         avg_road = task_main_loss["road"] / max(task_main_count["road"], 1)
         avg_drv = running_drv_loss / max(drv_count, 1)
 
-        val_time_acc = eval_multiclass_head(model, loaders["val_ts"], device, "time", "time")
-        val_scene_acc = eval_multiclass_head(model, loaders["val_ts"], device, "scene", "scene")
-        val_vis_acc = eval_multiclass_head(model, loaders["val_vis"], device, "visibility", "visibility")
-        val_road_acc = eval_multiclass_head(model, loaders["val_road"], device, "road_condition", "road_condition")
-        val_drv_iou = eval_drivable_iou(model, loaders["val_drv"], device)
+        val_time_acc = eval_multiclass_head(
+            model, loaders["val_ts"], device, "time", "time", max_batches=args.eval_max_batches
+        )
+        val_scene_acc = eval_multiclass_head(
+            model, loaders["val_ts"], device, "scene", "scene", max_batches=args.eval_max_batches
+        )
+        val_vis_acc = eval_multiclass_head(
+            model, loaders["val_vis"], device, "visibility", "visibility", max_batches=args.eval_max_batches
+        )
+        val_road_acc = eval_multiclass_head(
+            model, loaders["val_road"], device, "road_condition", "road_condition", max_batches=args.eval_max_batches
+        )
+        val_drv_iou = eval_drivable_iou(
+            model, loaders["val_drv"], device, max_batches=args.eval_max_batches
+        )
 
         score = (
             0.25 * val_time_acc

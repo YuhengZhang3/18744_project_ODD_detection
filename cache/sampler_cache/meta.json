@@ -1,0 +1,10 @@
+{
+  "bdd_root": "/home/yuhengz3@andrew.cmu.edu/bdd100k",
+  "rscd_root": "/home/yuhengz3@andrew.cmu.edu/rscd/dataset",
+  "seed": 42,
+  "road_val_ratio": 0.1,
+  "num_scene": 70000,
+  "num_time": 70000,
+  "num_visibility": 70000,
+  "num_road": 370151
+}
