@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 
-from configs.odd_config import BACKBONE_NAME, ADAPTER_DIM
+from configs.odd_config import BACKBONE_NAME
 
 
 class DinoBackbone(nn.Module):
-    # dinov2 vit + small adapter
+    # dinov2 vit backbone only
+    # adapters are moved to odd_model.py
 
-    def __init__(self, backbone_name=BACKBONE_NAME, out_dim=ADAPTER_DIM):
+    def __init__(self, backbone_name=BACKBONE_NAME):
         super().__init__()
 
         self.vit = torch.hub.load(
@@ -16,15 +17,9 @@ class DinoBackbone(nn.Module):
             pretrained=True,
         )
 
-        d_model = getattr(self.vit, "embed_dim", out_dim)
-
-        self.adapter = nn.Sequential(
-            nn.LayerNorm(d_model),
-            nn.Linear(d_model, out_dim),
-            nn.GELU(),
-        )
-
-        self.out_dim = out_dim
+        self.feat_dim = getattr(self.vit, "embed_dim", None)
+        if self.feat_dim is None:
+            raise RuntimeError("cannot infer DINO feature dim")
 
     @torch.no_grad()
     def freeze_backbone(self):
@@ -37,8 +32,8 @@ class DinoBackbone(nn.Module):
 
         if isinstance(feats, dict):
             if "x_norm_clstoken" in feats and "x_norm_patchtokens" in feats:
-                cls_token = feats["x_norm_clstoken"]
-                patch_tokens = feats["x_norm_patchtokens"]
+                cls_token = feats["x_norm_clstoken"]      # [B, D]
+                patch_tokens = feats["x_norm_patchtokens"]  # [B, N, D]
             elif "x" in feats:
                 tokens = feats["x"]
                 cls_token = tokens[:, 0]
@@ -50,7 +45,4 @@ class DinoBackbone(nn.Module):
             cls_token = feats[:, 0]
             patch_tokens = feats[:, 1:]
 
-        cls_feat = self.adapter(cls_token)
-        patch_feat = self.adapter(patch_tokens)
-
-        return cls_feat, patch_feat
+        return cls_token, patch_tokens
