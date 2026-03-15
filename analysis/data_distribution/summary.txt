@@ -1,0 +1,143 @@
+BDD train time (total=70000)
+   0 | dawn/dusk                 | count=5033     ratio=0.0719
+   1 | daytime                   | count=36800    ratio=0.5257
+   2 | night                     | count=28028    ratio=0.4004
+   3 | undefined                 | count=139      ratio=0.0020
+
+BDD train scene (total=70000)
+   0 | city street               | count=43581    ratio=0.6226
+   1 | gas stations              | count=27       ratio=0.0004
+   2 | highway                   | count=17414    ratio=0.2488
+   3 | parking lot               | count=378      ratio=0.0054
+   4 | residential               | count=8105     ratio=0.1158
+   5 | tunnel                    | count=129      ratio=0.0018
+   6 | undefined                 | count=366      ratio=0.0052
+
+BDD val time (total=10000)
+   0 | dawn/dusk                 | count=778      ratio=0.0778
+   1 | daytime                   | count=5258     ratio=0.5258
+   2 | night                     | count=3929     ratio=0.3929
+   3 | undefined                 | count=35       ratio=0.0035
+
+BDD val scene (total=10000)
+   0 | city street               | count=6112     ratio=0.6112
+   1 | gas stations              | count=7        ratio=0.0007
+   2 | highway                   | count=2499     ratio=0.2499
+   3 | parking lot               | count=49       ratio=0.0049
+   4 | residential               | count=1253     ratio=0.1253
+   5 | tunnel                    | count=27       ratio=0.0027
+   6 | undefined                 | count=53       ratio=0.0053
+
+BDD test time (total=20000)
+   0 | dawn/dusk                 | count=1476     ratio=0.0738
+   1 | daytime                   | count=10446    ratio=0.5223
+   2 | night                     | count=8036     ratio=0.4018
+   3 | undefined                 | count=42       ratio=0.0021
+
+BDD test scene (total=20000)
+   0 | city street               | count=12288    ratio=0.6144
+   1 | gas stations              | count=6        ratio=0.0003
+   2 | highway                   | count=5069     ratio=0.2535
+   3 | parking lot               | count=108      ratio=0.0054
+   4 | residential               | count=2382     ratio=0.1191
+   5 | tunnel                    | count=49       ratio=0.0024
+   6 | undefined                 | count=98       ratio=0.0049
+
+BDD train visibility (total=70000)
+   0 | poor                      | count=15880    ratio=0.2269
+   1 | medium                    | count=8448     ratio=0.1207
+   2 | good                      | count=45672    ratio=0.6525
+
+BDD val visibility (total=10000)
+   0 | poor                      | count=2245     ratio=0.2245
+   1 | medium                    | count=1153     ratio=0.1153
+   2 | good                      | count=6602     ratio=0.6602
+
+BDD test visibility (total=20000)
+   0 | poor                      | count=4619     ratio=0.2309
+   1 | medium                    | count=2383     ratio=0.1192
+   2 | good                      | count=12998    ratio=0.6499
+
+RSCD train road_condition (total=370151)
+   0 | dry_asphalt_smooth        | count=19913    ratio=0.0538
+   1 | dry_asphalt_slight        | count=23090    ratio=0.0624
+   2 | dry_asphalt_severe        | count=7930     ratio=0.0214
+   3 | dry_concrete_smooth       | count=19003    ratio=0.0513
+   4 | dry_concrete_slight       | count=11811    ratio=0.0319
+   5 | dry_concrete_severe       | count=21194    ratio=0.0573
+   6 | dry_gravel                | count=21413    ratio=0.0578
+   7 | dry_mud                   | count=22094    ratio=0.0597
+   8 | fresh_snow                | count=20511    ratio=0.0554
+   9 | melted_snow               | count=19902    ratio=0.0538
+  10 | water_asphalt_smooth      | count=21612    ratio=0.0584
+  11 | water_asphalt_slight      | count=2800     ratio=0.0076
+  12 | water_asphalt_severe      | count=2204     ratio=0.0060
+  13 | water_concrete_smooth     | count=19226    ratio=0.0519
+  14 | water_concrete_slight     | count=1181     ratio=0.0032
+  15 | water_concrete_severe     | count=4024     ratio=0.0109
+  16 | water_gravel              | count=6435     ratio=0.0174
+  17 | water_mud                 | count=7155     ratio=0.0193
+  18 | wet_asphalt_smooth        | count=21746    ratio=0.0587
+  19 | wet_asphalt_slight        | count=9408     ratio=0.0254
+  20 | wet_asphalt_severe        | count=1646     ratio=0.0044
+  21 | wet_concrete_smooth       | count=17376    ratio=0.0469
+  22 | wet_concrete_slight       | count=1163     ratio=0.0031
+  23 | wet_concrete_severe       | count=2763     ratio=0.0075
+  24 | wet_gravel                | count=21208    ratio=0.0573
+  25 | wet_mud                   | count=22140    ratio=0.0598
+  26 | ice                       | count=21203    ratio=0.0573
+
+RSCD test road_condition (total=360)
+   0 | dry_asphalt_smooth        | count=73       ratio=0.2028
+   1 | dry_asphalt_slight        | count=13       ratio=0.0361
+   2 | dry_asphalt_severe        | count=5        ratio=0.0139
+   3 | dry_concrete_smooth       | count=19       ratio=0.0528
+   4 | dry_concrete_slight       | count=10       ratio=0.0278
+   5 | dry_concrete_severe       | count=0        ratio=0.0000
+   6 | dry_gravel                | count=18       ratio=0.0500
+   7 | dry_mud                   | count=21       ratio=0.0583
+   8 | fresh_snow                | count=0        ratio=0.0000
+   9 | melted_snow               | count=0        ratio=0.0000
+  10 | water_asphalt_smooth      | count=4        ratio=0.0111
+  11 | water_asphalt_slight      | count=1        ratio=0.0028
+  12 | water_asphalt_severe      | count=0        ratio=0.0000
+  13 | water_concrete_smooth     | count=11       ratio=0.0306
+  14 | water_concrete_slight     | count=5        ratio=0.0139
+  15 | water_concrete_severe     | count=0        ratio=0.0000
+  16 | water_gravel              | count=5        ratio=0.0139
+  17 | water_mud                 | count=11       ratio=0.0306
+  18 | wet_asphalt_smooth        | count=84       ratio=0.2333
+  19 | wet_asphalt_slight        | count=31       ratio=0.0861
+  20 | wet_asphalt_severe        | count=1        ratio=0.0028
+  21 | wet_concrete_smooth       | count=16       ratio=0.0444
+  22 | wet_concrete_slight       | count=7        ratio=0.0194
+  23 | wet_concrete_severe       | count=1        ratio=0.0028
+  24 | wet_gravel                | count=4        ratio=0.0111
+  25 | wet_mud                   | count=20       ratio=0.0556
+  26 | ice                       | count=0        ratio=0.0000
+
+BDD drivable train pixel distribution (total_pixels=64512000000)
+   0 | background                | pixels=53585509179  ratio=0.8306
+   1 | alternative_drivable      | pixels=7794215843   ratio=0.1208
+   2 | direct_drivable           | pixels=3132274978   ratio=0.0486
+
+BDD drivable train image-level ratio summary
+  num_images=70000
+  mean_drivable_ratio=0.1694
+  mean_alternative_ratio=0.1208
+  mean_direct_ratio=0.0486
+  min_drivable_ratio=0.0000
+  max_drivable_ratio=0.5874
+
+BDD drivable val pixel distribution (total_pixels=9216000000)
+   0 | background                | pixels=7655327378   ratio=0.8307
+   1 | alternative_drivable      | pixels=1113294375   ratio=0.1208
+   2 | direct_drivable           | pixels=447378247    ratio=0.0485
+
+BDD drivable val image-level ratio summary
+  num_images=10000
+  mean_drivable_ratio=0.1693
+  mean_alternative_ratio=0.1208
+  mean_direct_ratio=0.0485
+  min_drivable_ratio=0.0000
+  max_drivable_ratio=0.4992

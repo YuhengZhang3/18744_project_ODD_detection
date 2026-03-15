@@ -31,3 +31,4 @@ tmp_smoke_runs/
 
 # optional local experiment files
 *.log
+*.csv
