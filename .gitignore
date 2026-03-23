@@ -21,6 +21,7 @@ data/*.jsonl
 outputs/
 checkpoints/
 source_images/
+source_images_old/
 output_json/
 
 # large files
