@@ -5,7 +5,7 @@ import torch
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
 
-def predict_weather(input_dir="../../source_images", json_dir="output_json"):
+def predict_weather(input_dir="../../datasets/acdc", json_dir="clip_json"):
     os.makedirs(json_dir, exist_ok=True)
     
     image_paths = []

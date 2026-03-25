@@ -81,6 +81,8 @@ def visualize_weather(image_dir="../../source_images", json_dir="output_json"):
             break
         elif key == ord('n'):
             idx += 1
+        elif key == ord('m'):
+            idx += 1000
         elif key == ord('b'):
             idx = max(0, idx - 1)
 
