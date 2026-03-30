@@ -11,3 +11,7 @@ tqdm
 ultralytics
 matplotlib
 Pillow
+
+# augmentation
+geoclip
+reverse_geocoder
