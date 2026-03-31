@@ -40,8 +40,8 @@ if __name__ == "__main__":
     # 项目根目录（scripts的上一级）
     project_root = script_dir.parent
     # 构建JSON文件路径
-    train_json = project_root / "data" / "roadwork" / "traj_annotations" / "trajectories_train_equidistant.json"
-    val_json = project_root / "data" / "roadwork" / "traj_annotations" / "trajectories_val_equidistant.json"
+    train_json = project_root / "data" / "roadwork_traj" / "traj_annotations" / "trajectories_train_equidistant.json"
+    val_json = project_root / "data" / "roadwork_traj" / "traj_annotations" / "trajectories_val_equidistant.json"
     
     # 检查文件是否存在
     json_files = []

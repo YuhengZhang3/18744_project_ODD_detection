@@ -41,7 +41,7 @@ class TrafficWorkzoneAnalyzer:
         self.CAR_CLASS_IDS = [self._get_class_id('vehicle')]
         self.PEDESTRIAN_CLASS_IDS = [self._get_class_id('pedestrian')]
         self.BICYCLE_CLASS_IDS = [self._get_class_id('bicycle')]
-        self.WORKZONE_CLASS_IDS = [3, 4, 5]
+        self.WORKZONE_CLASS_IDS = [3, 4, 5, 6]
         self.WORKZONE_CLASS_NAMES = [self.class_names[idx] for idx in self.WORKZONE_CLASS_IDS if idx < len(self.class_names)]
 
         if any(idx is None for idx in self.CAR_CLASS_IDS + self.PEDESTRIAN_CLASS_IDS + self.BICYCLE_CLASS_IDS):

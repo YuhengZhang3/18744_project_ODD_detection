@@ -59,8 +59,19 @@ def main():
     for key, value in yolo_config.items():
         print(f"  {key}: {value}")
 
+    # custom kw arguments that YOLO dont recognize
+    custom_keys = [
+        'model_name', 'device', 
+        'stage1_epochs', 'freeze', 'lr0_stage1', 'stage1_name',
+        'stage2_epochs', 'lr0_stage2', 'stage2_name',
+        'project'
+    ]
+    
+    # YOLO supported hyperparams
+    yolo_kwargs = {k: v for k, v in yolo_config.items() if k not in custom_keys}
+
     base_project_dir = Path(yolo_config.get('project') or 'runs/detect') # Default to runs/detect if project is None
-    stage1_base_name = yolo_config.get('stage1_name', 'yolo/stage1')
+    stage1_base_name = yolo_config.get('stage1_name', 'yolo11/stage1')
     stage1_full_base_path = base_project_dir / stage1_base_name # This is the "project/name" part passed to YOLO
 
     if args.stage2only:
@@ -83,21 +94,16 @@ def main():
         # ---------- Full two-stage training: run stage1 first ----------
         print("\n=== Stage 1: Training with frozen backbone ===")
         model = YOLOModel(
-            model_name=yolo_config.get('model_name', 'yolov8m.pt'),
+            model_name=yolo_config.get('model_name', 'yolo11m.pt'),
             device=yolo_config.get('device', 'cuda')
         )
         stage1_save_dir = model.train( # Capture the actual save directory
-            data=yolo_config['data'],
-            epochs=yolo_config.get('stage1_epochs', 30),
-            batch=yolo_config['batch'],
-            imgsz=yolo_config['imgsz'],
+            epochs=yolo_config.get('stage1_epochs', 12),
             freeze=yolo_config.get('freeze', 10),
-            lr0=yolo_config.get('lr0_stage1', 0.001),
-            project=yolo_config['project'],
+            lr0=yolo_config.get('lr0_stage1', 0.00038),
+            project=yolo_config.get('project'),
             name=stage1_full_base_path.name, # Pass only the name part
-            workers=yolo_config.get('workers', 8),
-            optimizer=yolo_config.get('optimizer', 'SGD'),
-            seed=yolo_config.get('seed', 42)
+            **yolo_kwargs # inject remaining YOLO parameters
         )
 
         # Use the captured save_dir to construct the path for stage 2
@@ -109,22 +115,16 @@ def main():
 
     # ---------- Stage 2 (common for both paths) ----------
     model.train(
-        data=yolo_config['data'],
-        epochs=yolo_config.get('stage2_epochs', 70),
-        batch=yolo_config['batch'],
-        imgsz=yolo_config['imgsz'],
+        epochs=yolo_config.get('stage2_epochs', 15),
         freeze=0,  # unfreeze all layers
-        lr0=yolo_config.get('lr0_stage2', 0.0001),
-        project=yolo_config['project'],
-        name=yolo_config.get('stage2_name', 'yolo/stage2'), # YOLO will handle its numbering if already exists
-        workers=yolo_config.get('workers', 8),
-        optimizer=yolo_config.get('optimizer', 'SGD'),
-        seed=yolo_config.get('seed', 42),
-        resume=False
+        lr0=yolo_config.get('lr0_stage2', 0.00038),
+        project=yolo_config.get('project'),
+        name=yolo_config.get('stage2_name', 'yolo11/stage2'), # YOLO will handle its numbering if already exists
+        resume=False,
+        **yolo_kwargs
     )
 
     print("\nTraining completed successfully.")
-
 
 if __name__ == '__main__':
     main()

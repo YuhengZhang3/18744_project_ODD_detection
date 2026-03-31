@@ -14,10 +14,11 @@ Target YOLO format:
 - Class mapping (6 classes):
     0: pedestrian (COCO person, ROADWork Worker, Police Officer)
     1: bicycle (COCO bicycle, motorcycle)
-    2: vehicle (COCO car, truck, bus; ROADWork Work Vehicle, Police Vehicle)
+    2: vehicle (COCO car, truck, bus, Police Vehicle)
     3: construction_channelizer (Cone, Drum, Tubular Marker, Vertical Panel)
     4: construction_barrier (Barrier, Barricade, Fence, Work Equipment)
     5: construction_sign (all Temporary Traffic Control Sign variants, Arrow Board, Message Board)
+    6: construction_vehicle (ROADwork Work Vehicle)
 """
 
 import json
@@ -127,15 +128,14 @@ class RoadWorkConverter(BaseConverter):
     """
 
     # Mapping from original category strings to target IDs.
-    # Derived from category_counts.txt and prior discussion.
     CATEGORY_MAP = {
         # pedestrians
         "Worker": 0,
         "Police Officer": 0,
         # bicycles (none in ROADWork, but keep for completeness)
         # vehicles
-        "Work Vehicle": 2,
-        "Police Vehicle": 2,
+        "Work Vehicle": 6,          # NOTE: work vehicle is now a class on its own
+        "Police Vehicle": 2,        # this still belongs to normal vehicles
         # construction channelizers
         "Cone": 3,
         "Drum": 3,
@@ -146,7 +146,7 @@ class RoadWorkConverter(BaseConverter):
         "Barricade": 4,
         "Fence": 4,
         "Work Equipment": 4,
-        # construction signs (all TTC signs and variants)
+        # construction signs
         "Temporary Traffic Control Sign": 5,
         "Arrow Board": 5,
         "Temporary Traffic Control Message Board": 5,
@@ -278,3 +278,65 @@ class BDDConverter(BaseConverter):
 
     def map_category(self, original_category):
         return self.CATEGORY_MAP.get(original_category, None)
+
+class CocoRoadWorkConverter(BaseConverter):
+    """
+    Converter for COCO-format ROADWork datasets (e.g., Pittsburgh subset).
+    Expects a COCO JSON file with 'images', 'annotations', 'categories' fields.
+    Uses the same category mapping as RoadWorkConverter.
+    """
+
+    def __init__(self, json_path, src_root, dst_root, split, **kwargs):
+        """
+        Args:
+            json_path (Path): Path to the COCO JSON file (e.g., instances_train_pittsburgh_only.json).
+            src_root (Path): Root directory containing the images (the 'file_name' in JSON is relative to this).
+            dst_root (Path): Destination root for YOLO dataset.
+            split (str): 'train' or 'val'.
+        """
+        super().__init__(src_root, dst_root, split, **kwargs)
+        self.json_path = Path(json_path)
+        with open(self.json_path, 'r') as f:
+            self.data = json.load(f)
+
+        # Build image_id -> (width, height, file_name) mapping
+        self.image_info = {}
+        for img in self.data.get('images', []):
+            img_id = img['id']
+            self.image_info[img_id] = {
+                'width': img['width'],
+                'height': img['height'],
+                'file_name': img['file_name'],
+            }
+
+        # Build category_id -> name mapping
+        self.cat_id_to_name = {}
+        for cat in self.data.get('categories', []):
+            self.cat_id_to_name[cat['id']] = cat['name']
+
+        # Build image_id -> list of (category_name, bbox) annotations
+        self.image_annotations = {}
+        for ann in self.data.get('annotations', []):
+            img_id = ann['image_id']
+            cat_name = self.cat_id_to_name.get(ann['category_id'], None)
+            if cat_name is None:
+                continue
+            bbox = ann.get('bbox', None)
+            if bbox and len(bbox) == 4:
+                self.image_annotations.setdefault(img_id, []).append((cat_name, bbox))
+
+    def parse_annotations(self):
+        for img_id, info in self.image_info.items():
+            image_id = Path(info['file_name']).stem
+            src_img_path = self.src_root / info['file_name']
+            objects = self.image_annotations.get(img_id, [])
+            yield {
+                'image_id': image_id,
+                'image_src_path': src_img_path,
+                'objects': objects,   # list of (category_name, bbox)
+            }
+
+    def map_category(self, original_category):
+        # Use the same mapping as RoadWorkConverter (which is already defined in this file)
+        # This map includes "Work Vehicle" -> 6 (construction_vehicle)
+        return RoadWorkConverter.CATEGORY_MAP.get(original_category, None)

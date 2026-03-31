@@ -29,12 +29,13 @@ from ultralytics import YOLO
 # Paths (adjust to your project structure)
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_ROOT = PROJECT_ROOT / 'data'
-ROADWORK_IMG_DIR = DATA_ROOT / 'roadwork' / 'images'          # all ROADWork images
+# ROADWORK_IMG_DIR = DATA_ROOT / 'roadwork_traj' / 'images'          # all ROADWork images
+YOLO_IMG_DIR = DATA_ROOT / 'yolo' / 'images'
 ORIGINAL_LABEL_DIR = DATA_ROOT / 'yolo' / 'labels'                 # contains train/ and val/ subdirs
 OUTPUT_DATASET_DIR = DATA_ROOT / 'yolo_augmented'                  # new dataset root
 
 # Model and inference settings
-MODEL_NAME = 'yolov8m.pt'                                           # COCO-pretrained model
+MODEL_NAME = 'yolo26m.pt'                                           # COCO-pretrained model
 CONF_THRESHOLD = 0.7                                                # confidence threshold for pseudo-labels
 IOU_THRESHOLD = 0.5                                                 # IoU threshold for discarding overlapping boxes
 
@@ -119,6 +120,17 @@ def main():
     print(f"Loading model {MODEL_NAME}...")
     model = YOLO(MODEL_NAME)
 
+    # Read ROADWork stems
+    roadwork_stems_file = DATA_ROOT / 'yolo' / 'roadwork_stems.txt'
+    roadwork_stems = set()
+    if roadwork_stems_file.exists():
+        with open(roadwork_stems_file, 'r') as f:
+            roadwork_stems = {line.strip() for line in f if line.strip()}
+        print(f"Loaded {len(roadwork_stems)} ROADWork stems from {roadwork_stems_file}")
+    else:
+        print(f"Warning: {roadwork_stems_file} not found. All images will be treated as ROADWork.")
+
+
     # Create output directories
     for split in SPLITS:
         (OUTPUT_DATASET_DIR / 'images' / split).mkdir(parents=True, exist_ok=True)
@@ -140,93 +152,113 @@ def main():
         # Process each image
         for label_path in tqdm(label_files, desc=f"Processing {split} images"):
             stem = label_path.stem  # image id without extension
-            img_path = ROADWORK_IMG_DIR / f"{stem}.jpg"
+            img_path = YOLO_IMG_DIR / split / f"{stem}.jpg"
             if not img_path.exists():
                 raise RuntimeError(f"Warning: Image {img_path} not found, aborting.")
             
-            print(f"Generating pseudolabels for {img_path}")
+            if stem in roadwork_stems:
+                # ROADWork: generate pseudo-labels and merge
+                print(f"Generating pseudolabels for {img_path}")
 
-            # ---------- Load original labels ----------
-            original_boxes = load_yolo_labels(label_path)  # list of (cls, coords)
+                # ---------- Load original labels ----------
+                original_boxes = load_yolo_labels(label_path)  # list of (cls, coords)
 
-            # ---------- Generate pseudo-labels (Task 1) ----------
-            # Run inference
-            results = model(img_path, verbose=False)[0]
-            pseudo_boxes = []
-            for det in results.boxes.data:
-                x1, y1, x2, y2, conf, cls = det.tolist()
-                if conf < CONF_THRESHOLD:
-                    continue
-                coco_cls = int(cls)
-                if coco_cls not in COCO_TO_OUR:
-                    continue
-                our_cls = COCO_TO_OUR[coco_cls]
+                # ---------- Generate pseudo-labels (Task 1) ----------
+                # Run inference
+                results = model(img_path, verbose=False)[0]
+                pseudo_boxes = []
+                for det in results.boxes.data:
+                    x1, y1, x2, y2, conf, cls = det.tolist()
+                    if conf < CONF_THRESHOLD:
+                        continue
+                    coco_cls = int(cls)
+                    if coco_cls not in COCO_TO_OUR:
+                        continue
+                    our_cls = COCO_TO_OUR[coco_cls]
 
-                # Convert to YOLO normalized center format
-                img_h, img_w = results.orig_shape
-                x_center = ((x1 + x2) / 2) / img_w
-                y_center = ((y1 + y2) / 2) / img_h
-                width = (x2 - x1) / img_w
-                height = (y2 - y1) / img_h
-                # Clamp to [0,1] (should already be within)
-                x_center = max(0, min(1, x_center))
-                y_center = max(0, min(1, y_center))
-                width = max(0, min(1, width))
-                height = max(0, min(1, height))
-                if width * height < 0.0001:  # skip tiny boxes
-                    continue
-                pseudo_boxes.append((our_cls, [x_center, y_center, width, height], conf))
+                    # Convert to YOLO normalized center format
+                    img_h, img_w = results.orig_shape
+                    x_center = ((x1 + x2) / 2) / img_w
+                    y_center = ((y1 + y2) / 2) / img_h
+                    width = (x2 - x1) / img_w
+                    height = (y2 - y1) / img_h
+                    # Clamp to [0,1] (should already be within)
+                    x_center = max(0, min(1, x_center))
+                    y_center = max(0, min(1, y_center))
+                    width = max(0, min(1, width))
+                    height = max(0, min(1, height))
+                    if width * height < 0.0001:  # skip tiny boxes
+                        continue
+                    pseudo_boxes.append((our_cls, [x_center, y_center, width, height], conf))
 
-            # ---------- Merge pseudo-labels with original (Task 2) ----------
-            # We will keep all original boxes.
-            merged_boxes = original_boxes.copy()  # list of (cls, coords)
+                # ---------- Merge pseudo-labels with original (Task 2) ----------
+                # We will keep all original boxes.
+                merged_boxes = original_boxes.copy()  # list of (cls, coords)
 
-            # For each pseudo box, check if it overlaps with any original box of the same class
-            for (p_cls, p_coords, conf) in pseudo_boxes:
-                # Only consider classes 0,1,2 (our target classes)
-                if p_cls not in [0, 1, 2]:
-                    continue
+                # For each pseudo box, check if it overlaps with any original box of the same class
+                for (p_cls, p_coords, conf) in pseudo_boxes:
+                    # Only consider classes 0,1,2 (our target classes)
+                    if p_cls not in [0, 1, 2]:
+                        continue
 
-                # Find original boxes of the same class
-                same_class_orig = [coords for (cls, coords) in original_boxes if cls == p_cls]
-                # Compute max IoU with any original box of same class
-                max_iou = 0
-                for o_coords in same_class_orig:
-                    iou_val = iou(p_coords, o_coords)
-                    if iou_val > max_iou:
-                        max_iou = iou_val
-                if max_iou < IOU_THRESHOLD:
-                    # No significant overlap, add this pseudo box
-                    merged_boxes.append((p_cls, p_coords))
+                    # Determine which original boxes to compare against
+                    if p_cls == 2:  # vehicle pseudo-label: check against all original boxes
+                        boxes_to_check = original_boxes
+                    else:           # pedestrian/bicycle: only same class
+                        boxes_to_check = [(cls, coords) for (cls, coords) in original_boxes if cls == p_cls]
 
-            # ---------- Save merged labels and create image symlink (Task 3) ----------
-            # Save merged labels
-            out_label_path = output_label_dir / f"{stem}.txt"
-            save_yolo_labels(out_label_path, merged_boxes)
+                    max_iou = 0
+                    for (o_cls, o_coords) in boxes_to_check:
+                        iou_val = iou(p_coords, o_coords)
+                        if iou_val > max_iou:
+                            max_iou = iou_val
 
-            # Create symlink for image (if not already exists)
-            out_img_path = output_img_dir / f"{stem}.jpg"
-            if not out_img_path.exists():
-                try:
-                    os.symlink(img_path, out_img_path)
-                except:
-                    # fallback to copy if symlink fails (e.g., on some systems)
-                    shutil.copy2(img_path, out_img_path)
+                    if max_iou < IOU_THRESHOLD:
+                        merged_boxes.append((p_cls, p_coords))
+
+                # ---------- Save merged labels and create image symlink (Task 3) ----------
+                # Save merged labels
+                out_label_path = output_label_dir / f"{stem}.txt"
+                save_yolo_labels(out_label_path, merged_boxes)
+
+                # Create symlink for image (if not already exists)
+                out_img_path = output_img_dir / f"{stem}.jpg"
+                if not out_img_path.exists():
+                    try:
+                        real_img_path = Path(os.path.realpath(img_path))
+                        os.symlink(real_img_path, out_img_path)
+                    except:
+                        # fallback to copy if symlink fails (e.g., on some systems)
+                        print(f"Fall back to copy for {out_img_path}!")
+                        shutil.copy2(img_path, out_img_path)
+            else:
+                # BDD: directly copy label and image
+                out_label_path = output_label_dir / f"{stem}.txt"
+                shutil.copy2(label_path, out_label_path)
+                out_img_path = output_img_dir / f"{stem}.jpg"
+                if not out_img_path.exists():
+                    real_img_path = Path(os.path.realpath(img_path))
+                    try:
+                        os.symlink(real_img_path, out_img_path)
+                    except:
+                        print(f"Fall back to copy for {out_img_path}!")
+                        shutil.copy2(real_img_path, out_img_path)
+
 
         print(f"Finished {split} split.")
+
+
 
     # ---------- Create data.yaml (Task 3) ----------
     yaml_path = OUTPUT_DATASET_DIR / 'data.yaml'
     with open(yaml_path, 'w') as f:
         f.write(f"""# YOLO dataset configuration for augmented dataset
-path: {OUTPUT_DATASET_DIR.resolve()}  # dataset root dir
-train: images/train
-val: images/val
-nc: 6
-names: ['pedestrian', 'bicycle', 'vehicle', 'construction_channelizer', 'construction_barrier', 'construction_sign']
-""")
-    print(f"\nDataset augmented and saved to {OUTPUT_DATASET_DIR}")
-    print(f"data.yaml created at {yaml_path}")
+    path: {OUTPUT_DATASET_DIR.resolve()}  # dataset root dir
+    train: images/train
+    val: images/val
+    nc: 7
+    names: ['pedestrian', 'bicycle', 'vehicle', 'construction_channelizer', 'construction_barrier', 'construction_sign', 'construction_vehicle']
+    """)
 
 
 if __name__ == '__main__':
