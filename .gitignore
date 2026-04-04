@@ -4,8 +4,16 @@ checkpoints*/
 *.pt
 *.pth
 
-# outputs
-eval_outputs/
+# keep final eval outputs and key cache
+!cache/
+!cache/hard_weight_cache/
+!cache/hard_weight_cache/rscd_train_sample_weights.pt
+
+!eval_outputs/
+!eval_outputs/eval_all_heads_coarse_to_fine/
+!eval_outputs/eval_all_heads_coarse_to_fine/**
+
+# other outputs
 infer_outputs/
 logs*
 analysis/

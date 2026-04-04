@@ -1,0 +1,162 @@
+ckpt: checkpoints_road_coarse_to_fine/best.pt
+device: cuda
+alpha_state: 0.35
+beta_severity: 0.1
+gate_threshold: 0.6
+gate_power: 1.5
+min_mix: 0.0
+
+=== VAL ===
+
+VAL direct road_condition
+overall acc: 0.8177
+   0 (dry_asphalt_smooth    ) acc=0.685  1361/1988
+   1 (dry_asphalt_slight    ) acc=0.618  1432/2318
+   2 (dry_asphalt_severe    ) acc=0.878  708/806
+   3 (dry_concrete_smooth   ) acc=0.670  1291/1926
+   4 (dry_concrete_slight   ) acc=0.761  909/1195
+   5 (dry_concrete_severe   ) acc=0.702  1482/2112
+   6 (dry_gravel            ) acc=0.815  1704/2090
+   7 (dry_mud               ) acc=0.891  1973/2215
+   8 (fresh_snow            ) acc=0.940  2001/2129
+   9 (melted_snow           ) acc=0.948  1900/2004
+  10 (water_asphalt_smooth  ) acc=0.877  1950/2223
+  11 (water_asphalt_slight  ) acc=0.633  162/256
+  12 (water_asphalt_severe  ) acc=0.788  175/222
+  13 (water_concrete_smooth ) acc=0.779  1475/1893
+  14 (water_concrete_slight ) acc=0.496  58/117
+  15 (water_concrete_severe ) acc=0.737  264/358
+  16 (water_gravel          ) acc=0.855  553/647
+  17 (water_mud             ) acc=0.891  614/689
+  18 (wet_asphalt_smooth    ) acc=0.896  1981/2211
+  19 (wet_asphalt_slight    ) acc=0.901  859/953
+  20 (wet_asphalt_severe    ) acc=0.840  131/156
+  21 (wet_concrete_smooth   ) acc=0.831  1415/1703
+  22 (wet_concrete_slight   ) acc=0.619  73/118
+  23 (wet_concrete_severe   ) acc=0.847  238/281
+  24 (wet_gravel            ) acc=0.820  1732/2111
+  25 (wet_mud               ) acc=0.896  1944/2169
+  26 (ice                   ) acc=0.886  1883/2125
+
+VAL direct road_state
+overall acc: 0.9214
+   0 (dry                   ) acc=0.917  13435/14650
+   1 (wet                   ) acc=0.917  8894/9702
+   2 (water                 ) acc=0.923  5913/6405
+   3 (snow                  ) acc=0.959  3964/4133
+   4 (ice                   ) acc=0.894  1900/2125
+
+VAL direct road_severity
+overall acc: 0.9275
+   0 (none                  ) acc=0.962  15558/16179
+   1 (smooth                ) acc=0.954  11398/11944
+   2 (slight                ) acc=0.805  3992/4957
+   3 (severe                ) acc=0.860  3385/3935
+
+VAL infer-style road_condition
+overall acc: 0.7783
+   0 (dry_asphalt_smooth    ) acc=0.502  998/1988
+   1 (dry_asphalt_slight    ) acc=0.447  1036/2318
+   2 (dry_asphalt_severe    ) acc=0.880  709/806
+   3 (dry_concrete_smooth   ) acc=0.464  894/1926
+   4 (dry_concrete_slight   ) acc=0.783  936/1195
+   5 (dry_concrete_severe   ) acc=0.757  1599/2112
+   6 (dry_gravel            ) acc=0.838  1751/2090
+   7 (dry_mud               ) acc=0.723  1601/2215
+   8 (fresh_snow            ) acc=0.944  2009/2129
+   9 (melted_snow           ) acc=0.975  1954/2004
+  10 (water_asphalt_smooth  ) acc=0.786  1748/2223
+  11 (water_asphalt_slight  ) acc=0.504  129/256
+  12 (water_asphalt_severe  ) acc=0.842  187/222
+  13 (water_concrete_smooth ) acc=0.705  1334/1893
+  14 (water_concrete_slight ) acc=0.444  52/117
+  15 (water_concrete_severe ) acc=0.740  265/358
+  16 (water_gravel          ) acc=0.793  513/647
+  17 (water_mud             ) acc=0.824  568/689
+  18 (wet_asphalt_smooth    ) acc=0.941  2080/2211
+  19 (wet_asphalt_slight    ) acc=0.892  850/953
+  20 (wet_asphalt_severe    ) acc=0.923  144/156
+  21 (wet_concrete_smooth   ) acc=0.777  1323/1703
+  22 (wet_concrete_slight   ) acc=0.449  53/118
+  23 (wet_concrete_severe   ) acc=0.776  218/281
+  24 (wet_gravel            ) acc=0.931  1966/2111
+  25 (wet_mud               ) acc=0.871  1890/2169
+  26 (ice                   ) acc=0.943  2003/2125
+
+
+=== TEST ===
+
+TEST direct road_condition
+overall acc: 0.2778
+   0 (dry_asphalt_smooth    ) acc=0.560  42/75
+   1 (dry_asphalt_slight    ) acc=0.000  0/2
+   2 (dry_asphalt_severe    ) acc=1.000  4/4
+   3 (dry_concrete_smooth   ) acc=0.850  17/20
+   4 (dry_concrete_slight   ) acc=0.000  0/12
+   5 (dry_concrete_severe   ) acc=0.000  0/0
+   6 (dry_gravel            ) acc=0.100  2/20
+   7 (dry_mud               ) acc=0.083  1/12
+   8 (fresh_snow            ) acc=0.000  0/0
+   9 (melted_snow           ) acc=0.000  0/0
+  10 (water_asphalt_smooth  ) acc=0.765  13/17
+  11 (water_asphalt_slight  ) acc=0.000  0/1
+  12 (water_asphalt_severe  ) acc=0.000  0/0
+  13 (water_concrete_smooth ) acc=0.000  0/9
+  14 (water_concrete_slight ) acc=0.500  3/6
+  15 (water_concrete_severe ) acc=0.000  0/0
+  16 (water_gravel          ) acc=0.000  0/0
+  17 (water_mud             ) acc=0.545  6/11
+  18 (wet_asphalt_smooth    ) acc=0.026  2/78
+  19 (wet_asphalt_slight    ) acc=0.000  0/31
+  20 (wet_asphalt_severe    ) acc=1.000  1/1
+  21 (wet_concrete_smooth   ) acc=0.292  7/24
+  22 (wet_concrete_slight   ) acc=0.000  0/6
+  23 (wet_concrete_severe   ) acc=0.000  0/1
+  24 (wet_gravel            ) acc=0.000  0/0
+  25 (wet_mud               ) acc=0.067  2/30
+  26 (ice                   ) acc=0.000  0/0
+
+TEST direct road_state
+overall acc: 0.5333
+   0 (dry                   ) acc=0.841  122/145
+   1 (wet                   ) acc=0.170  29/171
+   2 (water                 ) acc=0.932  41/44
+   3 (snow                  ) acc=0.000  0/0
+   4 (ice                   ) acc=0.000  0/0
+
+TEST direct road_severity
+overall acc: 0.5722
+   0 (none                  ) acc=0.808  59/73
+   1 (smooth                ) acc=0.592  132/223
+   2 (slight                ) acc=0.155  9/58
+   3 (severe                ) acc=1.000  6/6
+
+TEST infer-style road_condition
+overall acc: 0.3083
+   0 (dry_asphalt_smooth    ) acc=0.493  37/75
+   1 (dry_asphalt_slight    ) acc=0.000  0/2
+   2 (dry_asphalt_severe    ) acc=1.000  4/4
+   3 (dry_concrete_smooth   ) acc=0.900  18/20
+   4 (dry_concrete_slight   ) acc=0.000  0/12
+   5 (dry_concrete_severe   ) acc=0.000  0/0
+   6 (dry_gravel            ) acc=0.050  1/20
+   7 (dry_mud               ) acc=0.000  0/12
+   8 (fresh_snow            ) acc=0.000  0/0
+   9 (melted_snow           ) acc=0.000  0/0
+  10 (water_asphalt_smooth  ) acc=0.765  13/17
+  11 (water_asphalt_slight  ) acc=0.000  0/1
+  12 (water_asphalt_severe  ) acc=0.000  0/0
+  13 (water_concrete_smooth ) acc=0.111  1/9
+  14 (water_concrete_slight ) acc=0.333  2/6
+  15 (water_concrete_severe ) acc=0.000  0/0
+  16 (water_gravel          ) acc=0.000  0/0
+  17 (water_mud             ) acc=0.273  3/11
+  18 (wet_asphalt_smooth    ) acc=0.192  15/78
+  19 (wet_asphalt_slight    ) acc=0.032  1/31
+  20 (wet_asphalt_severe    ) acc=1.000  1/1
+  21 (wet_concrete_smooth   ) acc=0.292  7/24
+  22 (wet_concrete_slight   ) acc=0.000  0/6
+  23 (wet_concrete_severe   ) acc=1.000  1/1
+  24 (wet_gravel            ) acc=0.000  0/0
+  25 (wet_mud               ) acc=0.233  7/30
+  26 (ice                   ) acc=0.000  0/0
