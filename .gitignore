@@ -1,0 +1,15 @@
+# checkpoints
+checkpoints_road_coarse_to_fine/
+checkpoints*/
+*.pt
+*.pth
+
+# outputs
+eval_outputs/
+infer_outputs/
+logs*
+analysis/
+
+# python cache
+__pycache__/
+*.pyc
