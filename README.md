@@ -6,6 +6,7 @@ Current mainline:
 - shared DINOv2 backbone
 - multi-head prediction for BDD tasks
 - road branch for RSCD
+- anomaly branch for extreme ODD events
 - best road result from staged coarse-to-fine training
 
 ---
@@ -45,6 +46,26 @@ Meaning:
   - slight
   - severe
 
+## Anomaly branch
+A separate anomaly adapter is added on top of the shared backbone feature.  
+This branch only serves the anomaly head:
+
+- `anomalies`
+
+Current anomaly classes:
+- `none`
+- `extreme_weather`
+- `road_blockage_hazard`
+- `road_structure_failure`
+
+This design keeps the anomaly training isolated from the original BDD heads.  
+During anomaly training, only:
+- `anomaly_adapter`
+- `heads["anomalies"]`
+
+are updated.  
+The backbone, BDD branch, road branch, and drivable head stay frozen.
+
 ---
 
 # 2. Best training pipeline
@@ -61,7 +82,7 @@ Important checkpoint used as the road branch starting point in the original proj
 - `checkpoints_multitask_v2_hardboost/best.pt`
 
 This checkpoint is not kept in the current clean folder.  
-The clean folder keeps only the final mainline checkpoint.
+The clean folder keeps only the final mainline checkpoint and the anomaly fine-tuned checkpoint.
 
 ## Stage B: road branch finetuning
 Several road finetuning directions were tried:
@@ -74,7 +95,7 @@ Several road finetuning directions were tried:
 The best result among these earlier road-only directions came from stronger augmentation on the road branch.
 
 ## Stage C: staged coarse-to-fine training
-This is the current best mainline.
+This is the current best road mainline.
 
 ### Stage 1
 Train only:
@@ -109,29 +130,126 @@ Goal:
 
 This staged coarse-to-fine setup gives the best strict road result in the project.
 
+## Stage D: anomaly head training
+The anomaly head is initialized from the road mainline checkpoint:
+- `checkpoints_road_coarse_to_fine/best.pt`
+
+Then only these parts are trained:
+- `anomaly_adapter`
+- `heads["anomalies"]`
+
+Light augmentation is used for anomaly training:
+- resize to `336 x 336`
+- random horizontal flip
+- light color jitter
+
+Validation uses resize + normalization only.
+
 ---
 
-# 3. Current final checkpoint
+# 3. Current final checkpoints
 
-The clean folder keeps only the final best checkpoint:
-
+## Road mainline checkpoint
 - `checkpoints_road_coarse_to_fine/best.pt`
 
 This checkpoint is used for:
-- final evaluation
-- inference API
-- downstream integration
+- final road evaluation
+- original inference pipeline
+
+## Full anomaly-enabled checkpoint
+- `checkpoints_anomaly_head/best_model_only.pt`
+
+This checkpoint includes:
+- backbone
+- BDD heads
+- road heads
+- anomaly adapter
+- anomaly head
+
+This is the current full checkpoint to use for integrated inference.
+
+## Download link
+Google Drive link for the integrated checkpoint / shared artifact:
+- `https://drive.google.com/file/d/1yWrPM4lI1nOGBmvZ_S_5BIfVXR5Q3bvX/view?usp=sharing`
+
+Note: after the checkpoint saving format fix, future anomaly training runs can directly use `checkpoints_anomaly_head/best.pt` as the full inference checkpoint.
 
 ---
 
-# 4. Final evaluation results
+# 4. Dataset collection for anomaly head
 
-Final evaluation is saved under:
+The anomaly dataset is organized as:
+
+- `none`
+- `extreme_weather`
+- `road_blockage_hazard`
+- `road_structure_failure`
+
+## Source and collection notes
+The anomaly dataset was assembled from multiple public sources and manual curation:
+
+- public extreme weather image sources
+- selected public videos and frames collected for ODD-like extreme scenes
+- manually cleaned and regrouped into the four final categories
+- a separate `none` class was collected as non-anomalous negatives
+
+Earlier raw sources included public weather/disaster data such as DAWN and manually sampled images from public videos.  
+After cleaning and regrouping, the final raw anomaly folder used for training is:
+
+- `anomalies_odd_extreme_raw/`
+
+## Final class counts
+- `none`: `1000`
+- `extreme_weather`: `1027`
+- `road_blockage_hazard`: `787`
+- `road_structure_failure`: `468`
+
+Total:
+- `3282`
+
+## Split strategy
+The anomaly dataset loader uses class-wise splitting, not global random splitting.
+
+With `val_ratio = 0.2`, the current split is:
+
+### train
+- `none`: `800`
+- `extreme_weather`: `822`
+- `road_blockage_hazard`: `630`
+- `road_structure_failure`: `375`
+
+Total:
+- `2627`
+
+### val
+- `none`: `200`
+- `extreme_weather`: `205`
+- `road_blockage_hazard`: `157`
+- `road_structure_failure`: `93`
+
+Total:
+- `655`
+
+---
+
+# 5. Final evaluation results
+
+## Original mainline evaluation
+Final road mainline evaluation is saved under:
 
 - `eval_outputs/eval_all_heads_coarse_to_fine/summary.md`
 - `eval_outputs/eval_all_heads_coarse_to_fine/bdd/bdd_eval.txt`
 - `eval_outputs/eval_all_heads_coarse_to_fine/road_aux/road_aux_eval.txt`
-- `eval_outputs/eval_all_heads_coarse_to_fine/road_relaxed/road_relaxed.txt`
+- `eval_outputs/eval_all_heads_coarse_to_fine/road_relaxed/road_relaxed_eval.txt`
+
+## Integrated anomaly-enabled evaluation
+Integrated evaluation with anomaly head is saved under:
+
+- `eval_outputs/eval_all_heads_with_anomaly_fixed/summary.md`
+- `eval_outputs/eval_all_heads_with_anomaly_fixed/anomaly/anomaly_eval.txt`
+- `eval_outputs/eval_all_heads_with_anomaly_fixed/bdd/bdd_eval.txt`
+- `eval_outputs/eval_all_heads_with_anomaly_fixed/road_aux/road_aux_eval.txt`
+- `eval_outputs/eval_all_heads_with_anomaly_fixed/road_relaxed/road_relaxed_eval.txt`
 
 ## BDD results
 
@@ -208,16 +326,47 @@ Relaxed metrics mean:
 - relaxed-1 allows `wet <-> water` with same material and severity
 - relaxed-2 also allows `slight <-> smooth` with same state and material
 
+## Anomaly results
+
+### integrated eval on anomaly set
+- anomalies acc: `0.9951`
+
+Per class:
+- none: `0.998` (`998/1000`)
+- extreme_weather: `0.996` (`1023/1027`)
+- road_blockage_hazard: `0.990` (`779/787`)
+- road_structure_failure: `0.996` (`466/468`)
+
+### held-out anomaly val split
+This is the stricter anomaly validation result on the class-wise validation split.
+
+- overall acc: `0.9878`
+
+Per class:
+- none: `0.9950` (`199/200`)
+- extreme_weather: `0.9854` (`202/205`)
+- road_blockage_hazard: `0.9809` (`154/157`)
+- road_structure_failure: `0.9892` (`92/93`)
+
 ---
 
-# 5. Evaluation scripts
+# 6. Evaluation scripts
 
 ## Unified full evaluation
 This evaluates:
 - BDD heads
 - road direct / infer-style
 - road relaxed metrics
+- anomaly head
 
+```bash
+python scripts/eval_all_heads_v2.py \
+  --ckpt_path checkpoints_anomaly_head/best_model_only.pt \
+  --output_dir eval_outputs/eval_all_heads_with_anomaly_fixed \
+  --anomaly_root /home/.../anomalies_odd_extreme_raw
+```
+
+## Original road mainline evaluation
 ```bash
 python scripts/eval_all_heads_v2.py \
   --ckpt_path checkpoints_road_coarse_to_fine/best.pt \
@@ -238,18 +387,13 @@ python scripts/eval_road_relaxed.py \
   --output_dir eval_outputs/eval_road_relaxed_coarse_to_fine
 ```
 
-## Coarse-only road evaluation
-```bash
-python scripts/eval_road_coarse_only.py \
-  --ckpt_path checkpoints_road_coarse_stage/best.pt
-```
-
-Note:  
-`checkpoints_road_coarse_stage/best.pt` is not kept in the final clean folder.
+## Anomaly val-only quick check
+A simple anomaly validation check can be run with the anomaly dataset loader and the integrated checkpoint.  
+This was used to verify the held-out validation accuracy of `0.9878`.
 
 ---
 
-# 6. Inference interface
+# 7. Inference interface
 
 A reusable inference API is provided.
 
@@ -267,6 +411,7 @@ For each image, the API outputs json fields for:
 - `time`
 - `scene`
 - `visibility`
+- `anomalies`
 - `road_condition_direct`
 - `road_condition_infer`
 - `road_state`
@@ -278,13 +423,20 @@ For each image, the API outputs json fields for:
 - auxiliary reranking with `road_state` and `road_severity`
 - crop fusion
 
+The anomaly field uses the integrated anomaly-enabled checkpoint and predicts one of:
+- `none`
+- `extreme_weather`
+- `road_blockage_hazard`
+- `road_structure_failure`
+
 ## Command-line inference example
 
 Single image:
 ```bash
 python scripts/infer_pipeline_json.py \
   --input_path assets/demo.jpg \
-  --output_dir infer_outputs/demo_json
+  --output_dir infer_outputs/demo_json \
+  --ckpt_path checkpoints_anomaly_head/best_model_only.pt
 ```
 
 Directory inference:
@@ -292,6 +444,7 @@ Directory inference:
 python scripts/infer_pipeline_json.py \
   --input_path /path/to/images \
   --output_dir infer_outputs/demo_json_dir \
+  --ckpt_path checkpoints_anomaly_head/best_model_only.pt \
   --max_images 20
 ```
 
@@ -300,6 +453,7 @@ Recursive directory inference:
 python scripts/infer_pipeline_json.py \
   --input_path /path/to/images \
   --output_dir infer_outputs/demo_json_dir \
+  --ckpt_path checkpoints_anomaly_head/best_model_only.pt \
   --max_images 20 \
   --recursive
 ```
@@ -318,6 +472,7 @@ Example:
 python scripts/infer_pipeline_json.py \
   --input_path /path/to/images \
   --output_dir infer_outputs/demo_json_dir \
+  --ckpt_path checkpoints_anomaly_head/best_model_only.pt \
   --alpha_state 0.35 \
   --beta_severity 0.10 \
   --gate_threshold 0.60 \
@@ -347,7 +502,7 @@ Single image:
 from utils.infer_api import load_pipeline, infer_single_image_path
 
 pipe = load_pipeline(
-    ckpt_path="checkpoints_road_coarse_to_fine/best.pt"
+    ckpt_path="checkpoints_anomaly_head/best_model_only.pt"
 )
 
 result = infer_single_image_path(
@@ -356,6 +511,7 @@ result = infer_single_image_path(
 )
 
 print(result["prediction"]["time"]["label"])
+print(result["prediction"]["anomalies"]["label"])
 print(result["prediction"]["road_condition_infer"]["label"])
 ```
 
@@ -364,7 +520,7 @@ Directory:
 from utils.infer_api import load_pipeline, infer_path, save_results_to_dir
 
 pipe = load_pipeline(
-    ckpt_path="checkpoints_road_coarse_to_fine/best.pt"
+    ckpt_path="checkpoints_anomaly_head/best_model_only.pt"
 )
 
 results = infer_path(
@@ -383,12 +539,14 @@ save_results_to_dir(
 
 ---
 
-# 7. Kept files in the clean folder
+# 8. Kept files in the clean folder
 
 This clean folder keeps:
 - main code related to the current route
 - final mainline checkpoint only
+- anomaly training / evaluation code
 - key cache for RSCD sample weighting
+- selected final evaluation outputs
 
 Important kept items:
 - `configs/`
@@ -396,22 +554,26 @@ Important kept items:
 - `models/`
 - `utils/`
 - `scripts/`
-- `checkpoints_road_coarse_to_fine/best.pt`
 - `cache/hard_weight_cache/rscd_train_sample_weights.pt`
+- `eval_outputs/eval_all_heads_coarse_to_fine/`
+- `eval_outputs/eval_all_heads_with_anomaly_fixed/`
 
-Removed items:
-- older experiment checkpoints
+Removed or ignored items:
+- raw local datasets
+- local zip archives
+- intermediate infer outputs
+- old experiment checkpoints
 - logs
 - analysis outputs
-- infer outputs
-- eval outputs from previous messy versions
+- temporary backup files
 
 ---
 
-# 8. Notes
+# 9. Notes
 
 This clean version is intended for:
 - final mainline evaluation
+- anomaly head extension
 - teammate integration
 - reusable inference interface
 - easier local code reading
