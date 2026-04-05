@@ -495,6 +495,10 @@ infer_outputs/demo_json_dir/
 - `results_all.json`: all results together
 - `run_info.json`: run-level metadata
 
+## checkpoint
+https://drive.google.com/file/d/1yWrPM4lI1nOGBmvZ_S_5BIfVXR5Q3bvX/view?usp=sharing
+
+
 ## Python API example
 
 Single image:
