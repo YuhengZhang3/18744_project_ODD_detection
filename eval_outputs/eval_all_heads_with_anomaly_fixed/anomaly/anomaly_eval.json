@@ -1,0 +1,40 @@
+{
+  "ckpt_path": "checkpoints_anomaly_head/best_model_only.pt",
+  "device": "cuda",
+  "anomaly_root": "/home/yuhengz3@andrew.cmu.edu/bddcode/18744_project_ODD_detection_clean_code/anomalies_odd_extreme_raw",
+  "anomaly_result": {
+    "anomalies": {
+      "overall": 0.9951249238269348,
+      "per_class": [
+        {
+          "class_id": 0,
+          "class_name": "none",
+          "count": 1000,
+          "correct": 998,
+          "acc": 0.998
+        },
+        {
+          "class_id": 1,
+          "class_name": "extreme_weather",
+          "count": 1027,
+          "correct": 1023,
+          "acc": 0.9961051606621227
+        },
+        {
+          "class_id": 2,
+          "class_name": "road_blockage_hazard",
+          "count": 787,
+          "correct": 779,
+          "acc": 0.9898348157560356
+        },
+        {
+          "class_id": 3,
+          "class_name": "road_structure_failure",
+          "count": 468,
+          "correct": 466,
+          "acc": 0.9957264957264957
+        }
+      ]
+    }
+  }
+}

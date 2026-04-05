@@ -1,0 +1,291 @@
+{
+  "ckpt_path": "checkpoints_anomaly_head/best_model_only.pt",
+  "split": "test",
+  "device": "cuda",
+  "alpha_state": 0.5,
+  "beta_severity": 0.1,
+  "gate_threshold": 0.6,
+  "gate_power": 1.5,
+  "min_mix": 0.0,
+  "load_meta": {
+    "missing_keys": [],
+    "unexpected_keys": []
+  },
+  "result": {
+    "strict_acc": 0.31666666666666665,
+    "relaxed1_acc": 0.39444444444444443,
+    "relaxed2_acc": 0.45,
+    "per_class": [
+      {
+        "class_name": "dry_asphalt_smooth",
+        "count": 75,
+        "strict_acc": 0.52,
+        "relaxed1_acc": 0.52,
+        "relaxed2_acc": 0.5866666666666667,
+        "strict_correct": 39,
+        "relaxed1_correct": 39,
+        "relaxed2_correct": 44
+      },
+      {
+        "class_name": "dry_asphalt_slight",
+        "count": 2,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "dry_asphalt_severe",
+        "count": 4,
+        "strict_acc": 1.0,
+        "relaxed1_acc": 1.0,
+        "relaxed2_acc": 1.0,
+        "strict_correct": 4,
+        "relaxed1_correct": 4,
+        "relaxed2_correct": 4
+      },
+      {
+        "class_name": "dry_concrete_smooth",
+        "count": 20,
+        "strict_acc": 0.9,
+        "relaxed1_acc": 0.9,
+        "relaxed2_acc": 0.9,
+        "strict_correct": 18,
+        "relaxed1_correct": 18,
+        "relaxed2_correct": 18
+      },
+      {
+        "class_name": "dry_concrete_slight",
+        "count": 12,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.16666666666666666,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 2
+      },
+      {
+        "class_name": "dry_concrete_severe",
+        "count": 0,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "dry_gravel",
+        "count": 20,
+        "strict_acc": 0.05,
+        "relaxed1_acc": 0.05,
+        "relaxed2_acc": 0.05,
+        "strict_correct": 1,
+        "relaxed1_correct": 1,
+        "relaxed2_correct": 1
+      },
+      {
+        "class_name": "dry_mud",
+        "count": 12,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "fresh_snow",
+        "count": 0,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "melted_snow",
+        "count": 0,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "water_asphalt_smooth",
+        "count": 17,
+        "strict_acc": 0.7647058823529411,
+        "relaxed1_acc": 0.7647058823529411,
+        "relaxed2_acc": 0.7647058823529411,
+        "strict_correct": 13,
+        "relaxed1_correct": 13,
+        "relaxed2_correct": 13
+      },
+      {
+        "class_name": "water_asphalt_slight",
+        "count": 1,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "water_asphalt_severe",
+        "count": 0,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "water_concrete_smooth",
+        "count": 9,
+        "strict_acc": 0.1111111111111111,
+        "relaxed1_acc": 0.2222222222222222,
+        "relaxed2_acc": 0.3333333333333333,
+        "strict_correct": 1,
+        "relaxed1_correct": 2,
+        "relaxed2_correct": 3
+      },
+      {
+        "class_name": "water_concrete_slight",
+        "count": 6,
+        "strict_acc": 0.3333333333333333,
+        "relaxed1_acc": 0.3333333333333333,
+        "relaxed2_acc": 0.3333333333333333,
+        "strict_correct": 2,
+        "relaxed1_correct": 2,
+        "relaxed2_correct": 2
+      },
+      {
+        "class_name": "water_concrete_severe",
+        "count": 0,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "water_gravel",
+        "count": 0,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "water_mud",
+        "count": 11,
+        "strict_acc": 0.2727272727272727,
+        "relaxed1_acc": 0.2727272727272727,
+        "relaxed2_acc": 0.2727272727272727,
+        "strict_correct": 3,
+        "relaxed1_correct": 3,
+        "relaxed2_correct": 3
+      },
+      {
+        "class_name": "wet_asphalt_smooth",
+        "count": 78,
+        "strict_acc": 0.20512820512820512,
+        "relaxed1_acc": 0.3717948717948718,
+        "relaxed2_acc": 0.47435897435897434,
+        "strict_correct": 16,
+        "relaxed1_correct": 29,
+        "relaxed2_correct": 37
+      },
+      {
+        "class_name": "wet_asphalt_slight",
+        "count": 31,
+        "strict_acc": 0.03225806451612903,
+        "relaxed1_acc": 0.03225806451612903,
+        "relaxed2_acc": 0.16129032258064516,
+        "strict_correct": 1,
+        "relaxed1_correct": 1,
+        "relaxed2_correct": 5
+      },
+      {
+        "class_name": "wet_asphalt_severe",
+        "count": 1,
+        "strict_acc": 1.0,
+        "relaxed1_acc": 1.0,
+        "relaxed2_acc": 1.0,
+        "strict_correct": 1,
+        "relaxed1_correct": 1,
+        "relaxed2_correct": 1
+      },
+      {
+        "class_name": "wet_concrete_smooth",
+        "count": 24,
+        "strict_acc": 0.2916666666666667,
+        "relaxed1_acc": 0.4166666666666667,
+        "relaxed2_acc": 0.4166666666666667,
+        "strict_correct": 7,
+        "relaxed1_correct": 10,
+        "relaxed2_correct": 10
+      },
+      {
+        "class_name": "wet_concrete_slight",
+        "count": 6,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "wet_concrete_severe",
+        "count": 1,
+        "strict_acc": 1.0,
+        "relaxed1_acc": 1.0,
+        "relaxed2_acc": 1.0,
+        "strict_correct": 1,
+        "relaxed1_correct": 1,
+        "relaxed2_correct": 1
+      },
+      {
+        "class_name": "wet_gravel",
+        "count": 0,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      },
+      {
+        "class_name": "wet_mud",
+        "count": 30,
+        "strict_acc": 0.23333333333333334,
+        "relaxed1_acc": 0.6,
+        "relaxed2_acc": 0.6,
+        "strict_correct": 7,
+        "relaxed1_correct": 18,
+        "relaxed2_correct": 18
+      },
+      {
+        "class_name": "ice",
+        "count": 0,
+        "strict_acc": 0.0,
+        "relaxed1_acc": 0.0,
+        "relaxed2_acc": 0.0,
+        "strict_correct": 0,
+        "relaxed1_correct": 0,
+        "relaxed2_correct": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+ckpt: checkpoints_anomaly_head/best_model_only.pt
+split: test
+device: cuda
+alpha_state: 0.5
+beta_severity: 0.1
+gate_threshold: 0.6
+gate_power: 1.5
+min_mix: 0.0
+
+TEST
+strict exact acc: 0.3167
+relaxed-1 acc (wet<->water, same material+severity): 0.3944
+relaxed-2 acc (+ slight<->smooth, same state+material): 0.4500
+
+per-class:
+  dry_asphalt_smooth     count=75   strict=0.520 relaxed1=0.520 relaxed2=0.587
+  dry_asphalt_slight     count=2    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  dry_asphalt_severe     count=4    strict=1.000 relaxed1=1.000 relaxed2=1.000
+  dry_concrete_smooth    count=20   strict=0.900 relaxed1=0.900 relaxed2=0.900
+  dry_concrete_slight    count=12   strict=0.000 relaxed1=0.000 relaxed2=0.167
+  dry_concrete_severe    count=0    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  dry_gravel             count=20   strict=0.050 relaxed1=0.050 relaxed2=0.050
+  dry_mud                count=12   strict=0.000 relaxed1=0.000 relaxed2=0.000
+  fresh_snow             count=0    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  melted_snow            count=0    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  water_asphalt_smooth   count=17   strict=0.765 relaxed1=0.765 relaxed2=0.765
+  water_asphalt_slight   count=1    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  water_asphalt_severe   count=0    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  water_concrete_smooth  count=9    strict=0.111 relaxed1=0.222 relaxed2=0.333
+  water_concrete_slight  count=6    strict=0.333 relaxed1=0.333 relaxed2=0.333
+  water_concrete_severe  count=0    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  water_gravel           count=0    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  water_mud              count=11   strict=0.273 relaxed1=0.273 relaxed2=0.273
+  wet_asphalt_smooth     count=78   strict=0.205 relaxed1=0.372 relaxed2=0.474
+  wet_asphalt_slight     count=31   strict=0.032 relaxed1=0.032 relaxed2=0.161
+  wet_asphalt_severe     count=1    strict=1.000 relaxed1=1.000 relaxed2=1.000
+  wet_concrete_smooth    count=24   strict=0.292 relaxed1=0.417 relaxed2=0.417
+  wet_concrete_slight    count=6    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  wet_concrete_severe    count=1    strict=1.000 relaxed1=1.000 relaxed2=1.000
+  wet_gravel             count=0    strict=0.000 relaxed1=0.000 relaxed2=0.000
+  wet_mud                count=30   strict=0.233 relaxed1=0.600 relaxed2=0.600
+  ice                    count=0    strict=0.000 relaxed1=0.000 relaxed2=0.000

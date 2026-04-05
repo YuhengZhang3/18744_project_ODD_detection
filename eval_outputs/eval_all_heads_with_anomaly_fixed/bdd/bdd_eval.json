@@ -1,0 +1,136 @@
+{
+  "ckpt_path": "checkpoints_anomaly_head/best_model_only.pt",
+  "device": "cuda",
+  "bdd_root": "/home/yuhengz3@andrew.cmu.edu/bdd100k",
+  "bdd_split": "val",
+  "drivable_split": "val",
+  "load_meta": {
+    "missing_keys": [],
+    "unexpected_keys": []
+  },
+  "bdd_result": {
+    "time": {
+      "overall": 0.8982,
+      "per_class": [
+        {
+          "class_id": 0,
+          "class_name": "dawn/dusk",
+          "count": 778,
+          "correct": 509,
+          "acc": 0.6542416452442159
+        },
+        {
+          "class_id": 1,
+          "class_name": "daytime",
+          "count": 5258,
+          "correct": 4607,
+          "acc": 0.8761886648915937
+        },
+        {
+          "class_id": 2,
+          "class_name": "night",
+          "count": 3929,
+          "correct": 3841,
+          "acc": 0.9776024433698142
+        },
+        {
+          "class_id": 3,
+          "class_name": "undefined",
+          "count": 35,
+          "correct": 25,
+          "acc": 0.7142857142857143
+        }
+      ]
+    },
+    "scene": {
+      "overall": 0.7018,
+      "per_class": [
+        {
+          "class_id": 0,
+          "class_name": "city street",
+          "count": 6112,
+          "correct": 3881,
+          "acc": 0.6349803664921466
+        },
+        {
+          "class_id": 1,
+          "class_name": "gas stations",
+          "count": 7,
+          "correct": 3,
+          "acc": 0.42857142857142855
+        },
+        {
+          "class_id": 2,
+          "class_name": "highway",
+          "count": 2499,
+          "correct": 1990,
+          "acc": 0.7963185274109644
+        },
+        {
+          "class_id": 3,
+          "class_name": "parking lot",
+          "count": 49,
+          "correct": 36,
+          "acc": 0.7346938775510204
+        },
+        {
+          "class_id": 4,
+          "class_name": "residential",
+          "count": 1253,
+          "correct": 1073,
+          "acc": 0.8563447725458898
+        },
+        {
+          "class_id": 5,
+          "class_name": "tunnel",
+          "count": 27,
+          "correct": 23,
+          "acc": 0.8518518518518519
+        },
+        {
+          "class_id": 6,
+          "class_name": "undefined",
+          "count": 53,
+          "correct": 12,
+          "acc": 0.22641509433962265
+        }
+      ]
+    },
+    "visibility": {
+      "overall": 0.8703,
+      "per_class": [
+        {
+          "class_id": 0,
+          "class_name": "poor",
+          "count": 2245,
+          "correct": 1794,
+          "acc": 0.799109131403118
+        },
+        {
+          "class_id": 1,
+          "class_name": "medium",
+          "count": 1153,
+          "correct": 814,
+          "acc": 0.7059843885516045
+        },
+        {
+          "class_id": 2,
+          "class_name": "good",
+          "count": 6602,
+          "correct": 6095,
+          "acc": 0.9232050893668585
+        }
+      ]
+    },
+    "drivable": {
+      "iou_per_class": {
+        "background": 0.9313259574057267,
+        "alternative_drivable": 0.6714671450627496,
+        "direct_drivable": 0.42048850700769413
+      },
+      "miou_all": 0.6744272031587234,
+      "miou_fg": 0.5459778260352219,
+      "foreground_iou": 0.42048850700769413
+    }
+  }
+}

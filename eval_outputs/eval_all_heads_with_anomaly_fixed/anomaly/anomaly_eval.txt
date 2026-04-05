@@ -1,0 +1,6 @@
+Anomalies
+overall acc: 0.9951
+   0 (none                ) acc=0.998  998/1000
+   1 (extreme_weather     ) acc=0.996  1023/1027
+   2 (road_blockage_hazard) acc=0.990  779/787
+   3 (road_structure_failure) acc=0.996  466/468

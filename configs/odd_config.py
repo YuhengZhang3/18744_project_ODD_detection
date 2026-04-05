@@ -20,6 +20,12 @@ ODD_HEAD_CONFIG = {
         "num_classes": 3,
         "loss_weight": 1.0,
     },
+    "anomalies": {
+        "type": "multiclass",
+        # 0=none, 1=extreme_weather, 2=road_blockage_hazard, 3=road_structure_failure
+        "num_classes": 4,
+        "loss_weight": 1.0,
+    },
     "road_condition": {
         "type": "multiclass",
         # 27 classes in RSCD

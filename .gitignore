@@ -1,5 +1,6 @@
 # checkpoints
 checkpoints_road_coarse_to_fine/
+checkpoints_anomaly_head/
 checkpoints*/
 *.pt
 *.pth
@@ -12,8 +13,16 @@ checkpoints*/
 !eval_outputs/
 !eval_outputs/eval_all_heads_coarse_to_fine/
 !eval_outputs/eval_all_heads_coarse_to_fine/**
+!eval_outputs/eval_all_heads_with_anomaly_fixed/
+!eval_outputs/eval_all_heads_with_anomaly_fixed/**
 
-# other outputs
+# local datasets
+anomalies_odd_extreme_raw/
+anomalies_odd_extreme_raw.zip
+datasets/
+data_local/
+
+# generated outputs
 infer_outputs/
 logs*
 analysis/
@@ -21,3 +30,6 @@ analysis/
 # python cache
 __pycache__/
 *.pyc
+
+# mac files
+.DS_Store

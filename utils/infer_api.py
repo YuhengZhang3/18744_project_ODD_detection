@@ -14,6 +14,13 @@ from utils.infer_utils import (
 from data.bdd_dataset import TIME_CLASSES, SCENE_CLASSES, VIS_CLASSES, DRIVABLE_CLASSES
 from data.rscd_dataset import RSCD_CLASSES, ROAD_STATE_CLASSES, ROAD_SEVERITY_CLASSES
 
+ANOMALY_CLASSES = [
+    "none",
+    "extreme_weather",
+    "road_blockage_hazard",
+    "road_structure_failure",
+]
+
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
@@ -126,6 +133,13 @@ def infer_single_pil(pil_img, pipeline):
     result["time"] = softmax_info_from_logits(out["time"][0], TIME_CLASSES, topk=params["cls_topk"])
     result["scene"] = softmax_info_from_logits(out["scene"][0], SCENE_CLASSES, topk=params["cls_topk"])
     result["visibility"] = softmax_info_from_logits(out["visibility"][0], VIS_CLASSES, topk=params["cls_topk"])
+
+    if "anomalies" in out:
+        result["anomalies"] = softmax_info_from_logits(
+            out["anomalies"][0],
+            ANOMALY_CLASSES,
+            topk=min(params["cls_topk"], len(ANOMALY_CLASSES)),
+        )
 
     result["road_condition_direct"] = softmax_info_from_logits(
         out["road_condition"][0], RSCD_CLASSES, topk=params["road_topk"]

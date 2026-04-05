@@ -1,0 +1,931 @@
+{
+  "ckpt_path": "checkpoints_anomaly_head/best_model_only.pt",
+  "device": "cuda",
+  "alpha_state": 0.35,
+  "beta_severity": 0.1,
+  "gate_threshold": 0.6,
+  "gate_power": 1.5,
+  "min_mix": 0.0,
+  "load_meta": {
+    "missing_keys": [],
+    "unexpected_keys": []
+  },
+  "val": {
+    "direct": {
+      "road_condition_overall": 0.8177225449142239,
+      "road_condition_per_class": [
+        {
+          "class_id": 0,
+          "class_name": "dry_asphalt_smooth",
+          "count": 1988,
+          "correct": 1361,
+          "acc": 0.6846076458752515
+        },
+        {
+          "class_id": 1,
+          "class_name": "dry_asphalt_slight",
+          "count": 2318,
+          "correct": 1432,
+          "acc": 0.6177739430543572
+        },
+        {
+          "class_id": 2,
+          "class_name": "dry_asphalt_severe",
+          "count": 806,
+          "correct": 708,
+          "acc": 0.8784119106699751
+        },
+        {
+          "class_id": 3,
+          "class_name": "dry_concrete_smooth",
+          "count": 1926,
+          "correct": 1291,
+          "acc": 0.670301142263759
+        },
+        {
+          "class_id": 4,
+          "class_name": "dry_concrete_slight",
+          "count": 1195,
+          "correct": 909,
+          "acc": 0.7606694560669456
+        },
+        {
+          "class_id": 5,
+          "class_name": "dry_concrete_severe",
+          "count": 2112,
+          "correct": 1482,
+          "acc": 0.7017045454545454
+        },
+        {
+          "class_id": 6,
+          "class_name": "dry_gravel",
+          "count": 2090,
+          "correct": 1704,
+          "acc": 0.815311004784689
+        },
+        {
+          "class_id": 7,
+          "class_name": "dry_mud",
+          "count": 2215,
+          "correct": 1973,
+          "acc": 0.890744920993228
+        },
+        {
+          "class_id": 8,
+          "class_name": "fresh_snow",
+          "count": 2129,
+          "correct": 2001,
+          "acc": 0.9398778769375293
+        },
+        {
+          "class_id": 9,
+          "class_name": "melted_snow",
+          "count": 2004,
+          "correct": 1900,
+          "acc": 0.9481037924151696
+        },
+        {
+          "class_id": 10,
+          "class_name": "water_asphalt_smooth",
+          "count": 2223,
+          "correct": 1950,
+          "acc": 0.8771929824561403
+        },
+        {
+          "class_id": 11,
+          "class_name": "water_asphalt_slight",
+          "count": 256,
+          "correct": 162,
+          "acc": 0.6328125
+        },
+        {
+          "class_id": 12,
+          "class_name": "water_asphalt_severe",
+          "count": 222,
+          "correct": 175,
+          "acc": 0.7882882882882883
+        },
+        {
+          "class_id": 13,
+          "class_name": "water_concrete_smooth",
+          "count": 1893,
+          "correct": 1475,
+          "acc": 0.7791864764923402
+        },
+        {
+          "class_id": 14,
+          "class_name": "water_concrete_slight",
+          "count": 117,
+          "correct": 58,
+          "acc": 0.49572649572649574
+        },
+        {
+          "class_id": 15,
+          "class_name": "water_concrete_severe",
+          "count": 358,
+          "correct": 264,
+          "acc": 0.7374301675977654
+        },
+        {
+          "class_id": 16,
+          "class_name": "water_gravel",
+          "count": 647,
+          "correct": 553,
+          "acc": 0.8547140649149922
+        },
+        {
+          "class_id": 17,
+          "class_name": "water_mud",
+          "count": 689,
+          "correct": 614,
+          "acc": 0.8911465892597968
+        },
+        {
+          "class_id": 18,
+          "class_name": "wet_asphalt_smooth",
+          "count": 2211,
+          "correct": 1981,
+          "acc": 0.8959746720940751
+        },
+        {
+          "class_id": 19,
+          "class_name": "wet_asphalt_slight",
+          "count": 953,
+          "correct": 859,
+          "acc": 0.9013641133263379
+        },
+        {
+          "class_id": 20,
+          "class_name": "wet_asphalt_severe",
+          "count": 156,
+          "correct": 131,
+          "acc": 0.8397435897435898
+        },
+        {
+          "class_id": 21,
+          "class_name": "wet_concrete_smooth",
+          "count": 1703,
+          "correct": 1415,
+          "acc": 0.830886670581327
+        },
+        {
+          "class_id": 22,
+          "class_name": "wet_concrete_slight",
+          "count": 118,
+          "correct": 73,
+          "acc": 0.6186440677966102
+        },
+        {
+          "class_id": 23,
+          "class_name": "wet_concrete_severe",
+          "count": 281,
+          "correct": 238,
+          "acc": 0.8469750889679716
+        },
+        {
+          "class_id": 24,
+          "class_name": "wet_gravel",
+          "count": 2111,
+          "correct": 1732,
+          "acc": 0.8204642349597348
+        },
+        {
+          "class_id": 25,
+          "class_name": "wet_mud",
+          "count": 2169,
+          "correct": 1944,
+          "acc": 0.8962655601659751
+        },
+        {
+          "class_id": 26,
+          "class_name": "ice",
+          "count": 2125,
+          "correct": 1883,
+          "acc": 0.8861176470588236
+        }
+      ],
+      "road_state_overall": 0.9214102390922599,
+      "road_state_per_class": [
+        {
+          "class_id": 0,
+          "class_name": "dry",
+          "count": 14650,
+          "correct": 13435,
+          "acc": 0.9170648464163823
+        },
+        {
+          "class_id": 1,
+          "class_name": "wet",
+          "count": 9702,
+          "correct": 8894,
+          "acc": 0.9167182024324881
+        },
+        {
+          "class_id": 2,
+          "class_name": "water",
+          "count": 6405,
+          "correct": 5913,
+          "acc": 0.9231850117096019
+        },
+        {
+          "class_id": 3,
+          "class_name": "snow",
+          "count": 4133,
+          "correct": 3964,
+          "acc": 0.9591096056133559
+        },
+        {
+          "class_id": 4,
+          "class_name": "ice",
+          "count": 2125,
+          "correct": 1900,
+          "acc": 0.8941176470588236
+        }
+      ],
+      "road_severity_overall": 0.9275428880183709,
+      "road_severity_per_class": [
+        {
+          "class_id": 0,
+          "class_name": "none",
+          "count": 16179,
+          "correct": 15558,
+          "acc": 0.9616169108103096
+        },
+        {
+          "class_id": 1,
+          "class_name": "smooth",
+          "count": 11944,
+          "correct": 11398,
+          "acc": 0.9542866711319491
+        },
+        {
+          "class_id": 2,
+          "class_name": "slight",
+          "count": 4957,
+          "correct": 3992,
+          "acc": 0.8053258018963082
+        },
+        {
+          "class_id": 3,
+          "class_name": "severe",
+          "count": 3935,
+          "correct": 3385,
+          "acc": 0.8602287166454892
+        }
+      ]
+    },
+    "infer_style": {
+      "infer_style_road_condition_overall": 0.7783331081993786,
+      "infer_style_road_condition_per_class": [
+        {
+          "class_id": 0,
+          "class_name": "dry_asphalt_smooth",
+          "count": 1988,
+          "correct": 998,
+          "acc": 0.5020120724346077
+        },
+        {
+          "class_id": 1,
+          "class_name": "dry_asphalt_slight",
+          "count": 2318,
+          "correct": 1036,
+          "acc": 0.4469370146678171
+        },
+        {
+          "class_id": 2,
+          "class_name": "dry_asphalt_severe",
+          "count": 806,
+          "correct": 709,
+          "acc": 0.8796526054590571
+        },
+        {
+          "class_id": 3,
+          "class_name": "dry_concrete_smooth",
+          "count": 1926,
+          "correct": 894,
+          "acc": 0.46417445482866043
+        },
+        {
+          "class_id": 4,
+          "class_name": "dry_concrete_slight",
+          "count": 1195,
+          "correct": 936,
+          "acc": 0.7832635983263598
+        },
+        {
+          "class_id": 5,
+          "class_name": "dry_concrete_severe",
+          "count": 2112,
+          "correct": 1599,
+          "acc": 0.7571022727272727
+        },
+        {
+          "class_id": 6,
+          "class_name": "dry_gravel",
+          "count": 2090,
+          "correct": 1751,
+          "acc": 0.837799043062201
+        },
+        {
+          "class_id": 7,
+          "class_name": "dry_mud",
+          "count": 2215,
+          "correct": 1601,
+          "acc": 0.7227990970654627
+        },
+        {
+          "class_id": 8,
+          "class_name": "fresh_snow",
+          "count": 2129,
+          "correct": 2009,
+          "acc": 0.9436355096289337
+        },
+        {
+          "class_id": 9,
+          "class_name": "melted_snow",
+          "count": 2004,
+          "correct": 1954,
+          "acc": 0.9750499001996008
+        },
+        {
+          "class_id": 10,
+          "class_name": "water_asphalt_smooth",
+          "count": 2223,
+          "correct": 1748,
+          "acc": 0.7863247863247863
+        },
+        {
+          "class_id": 11,
+          "class_name": "water_asphalt_slight",
+          "count": 256,
+          "correct": 129,
+          "acc": 0.50390625
+        },
+        {
+          "class_id": 12,
+          "class_name": "water_asphalt_severe",
+          "count": 222,
+          "correct": 187,
+          "acc": 0.8423423423423423
+        },
+        {
+          "class_id": 13,
+          "class_name": "water_concrete_smooth",
+          "count": 1893,
+          "correct": 1334,
+          "acc": 0.7047015319598521
+        },
+        {
+          "class_id": 14,
+          "class_name": "water_concrete_slight",
+          "count": 117,
+          "correct": 52,
+          "acc": 0.4444444444444444
+        },
+        {
+          "class_id": 15,
+          "class_name": "water_concrete_severe",
+          "count": 358,
+          "correct": 265,
+          "acc": 0.7402234636871509
+        },
+        {
+          "class_id": 16,
+          "class_name": "water_gravel",
+          "count": 647,
+          "correct": 513,
+          "acc": 0.7928902627511591
+        },
+        {
+          "class_id": 17,
+          "class_name": "water_mud",
+          "count": 689,
+          "correct": 568,
+          "acc": 0.8243831640058055
+        },
+        {
+          "class_id": 18,
+          "class_name": "wet_asphalt_smooth",
+          "count": 2211,
+          "correct": 2080,
+          "acc": 0.9407507914970602
+        },
+        {
+          "class_id": 19,
+          "class_name": "wet_asphalt_slight",
+          "count": 953,
+          "correct": 850,
+          "acc": 0.8919202518363064
+        },
+        {
+          "class_id": 20,
+          "class_name": "wet_asphalt_severe",
+          "count": 156,
+          "correct": 144,
+          "acc": 0.9230769230769231
+        },
+        {
+          "class_id": 21,
+          "class_name": "wet_concrete_smooth",
+          "count": 1703,
+          "correct": 1323,
+          "acc": 0.7768643570170288
+        },
+        {
+          "class_id": 22,
+          "class_name": "wet_concrete_slight",
+          "count": 118,
+          "correct": 53,
+          "acc": 0.4491525423728814
+        },
+        {
+          "class_id": 23,
+          "class_name": "wet_concrete_severe",
+          "count": 281,
+          "correct": 218,
+          "acc": 0.7758007117437722
+        },
+        {
+          "class_id": 24,
+          "class_name": "wet_gravel",
+          "count": 2111,
+          "correct": 1966,
+          "acc": 0.9313121743249645
+        },
+        {
+          "class_id": 25,
+          "class_name": "wet_mud",
+          "count": 2169,
+          "correct": 1890,
+          "acc": 0.8713692946058091
+        },
+        {
+          "class_id": 26,
+          "class_name": "ice",
+          "count": 2125,
+          "correct": 2003,
+          "acc": 0.9425882352941176
+        }
+      ]
+    }
+  },
+  "test": {
+    "direct": {
+      "road_condition_overall": 0.2777777777777778,
+      "road_condition_per_class": [
+        {
+          "class_id": 0,
+          "class_name": "dry_asphalt_smooth",
+          "count": 75,
+          "correct": 42,
+          "acc": 0.56
+        },
+        {
+          "class_id": 1,
+          "class_name": "dry_asphalt_slight",
+          "count": 2,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 2,
+          "class_name": "dry_asphalt_severe",
+          "count": 4,
+          "correct": 4,
+          "acc": 1.0
+        },
+        {
+          "class_id": 3,
+          "class_name": "dry_concrete_smooth",
+          "count": 20,
+          "correct": 17,
+          "acc": 0.85
+        },
+        {
+          "class_id": 4,
+          "class_name": "dry_concrete_slight",
+          "count": 12,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 5,
+          "class_name": "dry_concrete_severe",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 6,
+          "class_name": "dry_gravel",
+          "count": 20,
+          "correct": 2,
+          "acc": 0.1
+        },
+        {
+          "class_id": 7,
+          "class_name": "dry_mud",
+          "count": 12,
+          "correct": 1,
+          "acc": 0.08333333333333333
+        },
+        {
+          "class_id": 8,
+          "class_name": "fresh_snow",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 9,
+          "class_name": "melted_snow",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 10,
+          "class_name": "water_asphalt_smooth",
+          "count": 17,
+          "correct": 13,
+          "acc": 0.7647058823529411
+        },
+        {
+          "class_id": 11,
+          "class_name": "water_asphalt_slight",
+          "count": 1,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 12,
+          "class_name": "water_asphalt_severe",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 13,
+          "class_name": "water_concrete_smooth",
+          "count": 9,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 14,
+          "class_name": "water_concrete_slight",
+          "count": 6,
+          "correct": 3,
+          "acc": 0.5
+        },
+        {
+          "class_id": 15,
+          "class_name": "water_concrete_severe",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 16,
+          "class_name": "water_gravel",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 17,
+          "class_name": "water_mud",
+          "count": 11,
+          "correct": 6,
+          "acc": 0.5454545454545454
+        },
+        {
+          "class_id": 18,
+          "class_name": "wet_asphalt_smooth",
+          "count": 78,
+          "correct": 2,
+          "acc": 0.02564102564102564
+        },
+        {
+          "class_id": 19,
+          "class_name": "wet_asphalt_slight",
+          "count": 31,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 20,
+          "class_name": "wet_asphalt_severe",
+          "count": 1,
+          "correct": 1,
+          "acc": 1.0
+        },
+        {
+          "class_id": 21,
+          "class_name": "wet_concrete_smooth",
+          "count": 24,
+          "correct": 7,
+          "acc": 0.2916666666666667
+        },
+        {
+          "class_id": 22,
+          "class_name": "wet_concrete_slight",
+          "count": 6,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 23,
+          "class_name": "wet_concrete_severe",
+          "count": 1,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 24,
+          "class_name": "wet_gravel",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 25,
+          "class_name": "wet_mud",
+          "count": 30,
+          "correct": 2,
+          "acc": 0.06666666666666667
+        },
+        {
+          "class_id": 26,
+          "class_name": "ice",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        }
+      ],
+      "road_state_overall": 0.5333333333333333,
+      "road_state_per_class": [
+        {
+          "class_id": 0,
+          "class_name": "dry",
+          "count": 145,
+          "correct": 122,
+          "acc": 0.8413793103448276
+        },
+        {
+          "class_id": 1,
+          "class_name": "wet",
+          "count": 171,
+          "correct": 29,
+          "acc": 0.1695906432748538
+        },
+        {
+          "class_id": 2,
+          "class_name": "water",
+          "count": 44,
+          "correct": 41,
+          "acc": 0.9318181818181818
+        },
+        {
+          "class_id": 3,
+          "class_name": "snow",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 4,
+          "class_name": "ice",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        }
+      ],
+      "road_severity_overall": 0.5722222222222222,
+      "road_severity_per_class": [
+        {
+          "class_id": 0,
+          "class_name": "none",
+          "count": 73,
+          "correct": 59,
+          "acc": 0.8082191780821918
+        },
+        {
+          "class_id": 1,
+          "class_name": "smooth",
+          "count": 223,
+          "correct": 132,
+          "acc": 0.5919282511210763
+        },
+        {
+          "class_id": 2,
+          "class_name": "slight",
+          "count": 58,
+          "correct": 9,
+          "acc": 0.15517241379310345
+        },
+        {
+          "class_id": 3,
+          "class_name": "severe",
+          "count": 6,
+          "correct": 6,
+          "acc": 1.0
+        }
+      ]
+    },
+    "infer_style": {
+      "infer_style_road_condition_overall": 0.30833333333333335,
+      "infer_style_road_condition_per_class": [
+        {
+          "class_id": 0,
+          "class_name": "dry_asphalt_smooth",
+          "count": 75,
+          "correct": 37,
+          "acc": 0.49333333333333335
+        },
+        {
+          "class_id": 1,
+          "class_name": "dry_asphalt_slight",
+          "count": 2,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 2,
+          "class_name": "dry_asphalt_severe",
+          "count": 4,
+          "correct": 4,
+          "acc": 1.0
+        },
+        {
+          "class_id": 3,
+          "class_name": "dry_concrete_smooth",
+          "count": 20,
+          "correct": 18,
+          "acc": 0.9
+        },
+        {
+          "class_id": 4,
+          "class_name": "dry_concrete_slight",
+          "count": 12,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 5,
+          "class_name": "dry_concrete_severe",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 6,
+          "class_name": "dry_gravel",
+          "count": 20,
+          "correct": 1,
+          "acc": 0.05
+        },
+        {
+          "class_id": 7,
+          "class_name": "dry_mud",
+          "count": 12,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 8,
+          "class_name": "fresh_snow",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 9,
+          "class_name": "melted_snow",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 10,
+          "class_name": "water_asphalt_smooth",
+          "count": 17,
+          "correct": 13,
+          "acc": 0.7647058823529411
+        },
+        {
+          "class_id": 11,
+          "class_name": "water_asphalt_slight",
+          "count": 1,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 12,
+          "class_name": "water_asphalt_severe",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 13,
+          "class_name": "water_concrete_smooth",
+          "count": 9,
+          "correct": 1,
+          "acc": 0.1111111111111111
+        },
+        {
+          "class_id": 14,
+          "class_name": "water_concrete_slight",
+          "count": 6,
+          "correct": 2,
+          "acc": 0.3333333333333333
+        },
+        {
+          "class_id": 15,
+          "class_name": "water_concrete_severe",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 16,
+          "class_name": "water_gravel",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 17,
+          "class_name": "water_mud",
+          "count": 11,
+          "correct": 3,
+          "acc": 0.2727272727272727
+        },
+        {
+          "class_id": 18,
+          "class_name": "wet_asphalt_smooth",
+          "count": 78,
+          "correct": 15,
+          "acc": 0.19230769230769232
+        },
+        {
+          "class_id": 19,
+          "class_name": "wet_asphalt_slight",
+          "count": 31,
+          "correct": 1,
+          "acc": 0.03225806451612903
+        },
+        {
+          "class_id": 20,
+          "class_name": "wet_asphalt_severe",
+          "count": 1,
+          "correct": 1,
+          "acc": 1.0
+        },
+        {
+          "class_id": 21,
+          "class_name": "wet_concrete_smooth",
+          "count": 24,
+          "correct": 7,
+          "acc": 0.2916666666666667
+        },
+        {
+          "class_id": 22,
+          "class_name": "wet_concrete_slight",
+          "count": 6,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 23,
+          "class_name": "wet_concrete_severe",
+          "count": 1,
+          "correct": 1,
+          "acc": 1.0
+        },
+        {
+          "class_id": 24,
+          "class_name": "wet_gravel",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        },
+        {
+          "class_id": 25,
+          "class_name": "wet_mud",
+          "count": 30,
+          "correct": 7,
+          "acc": 0.23333333333333334
+        },
+        {
+          "class_id": 26,
+          "class_name": "ice",
+          "count": 0,
+          "correct": 0,
+          "acc": 0.0
+        }
+      ]
+    }
+  }
+}

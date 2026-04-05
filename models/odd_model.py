@@ -5,7 +5,7 @@ from .backbone_dinov2 import DinoBackbone
 from .heads import SimpleHead, PatchSegHead
 
 
-_BDD_GLOBAL_HEADS = {"time", "scene", "visibility"}
+_BDD_GLOBAL_HEADS = {"time", "scene", "visibility", "anomalies"}
 _ROAD_HEADS = {"road_condition", "road_state", "road_severity"}
 _DENSE_HEADS = {"drivable"}
 
@@ -38,6 +38,9 @@ class ODDModel(nn.Module):
         # private adapter for road branch
         self.road_adapter = make_adapter(feat_dim, ADAPTER_DIM)
 
+        # private adapter for anomaly branch
+        self.anomaly_adapter = make_adapter(feat_dim, ADAPTER_DIM)
+
         self.heads = nn.ModuleDict()
 
         for name, cfg in ODD_HEAD_CONFIG.items():
@@ -69,12 +72,18 @@ class ODDModel(nn.Module):
         # road branch
         road_cls = self.road_adapter(raw_cls)
 
+        # anomaly branch
+        anomaly_cls = self.anomaly_adapter(raw_cls)
+
         out = {}
 
         # bdd global heads
         for name in _BDD_GLOBAL_HEADS:
             if name in self.heads:
-                out[name] = self.heads[name](bdd_cls)
+                if name == "anomalies":
+                    out[name] = self.heads[name](anomaly_cls)
+                else:
+                    out[name] = self.heads[name](bdd_cls)
 
         # road head
         for name in _ROAD_HEADS:

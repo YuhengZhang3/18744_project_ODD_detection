@@ -30,6 +30,8 @@ from data.bdd_dataset import (
     DRIVABLE_CLASSES,
 )
 
+ANOMALY_CLASSES = ["none", "extreme_weather", "road_blockage_hazard", "road_structure_failure"]
+
 
 def make_simple_loader(dataset, batch_size, num_workers, collate_fn=None):
     return DataLoader(
@@ -242,6 +244,80 @@ def eval_drivable(model, loader, device):
     }
 
 
+
+class AnomalyImageFolder(torch.utils.data.Dataset):
+    def __init__(self, root, transform, val_ratio=0.2, split="val", seed=42):
+        from pathlib import Path
+        import random
+
+        self.root = Path(root)
+        self.transform = transform
+        self.class_names = ANOMALY_CLASSES
+        self.class_to_idx = {c: i for i, c in enumerate(self.class_names)}
+
+        items = []
+        for cname in self.class_names:
+            cdir = self.root / cname
+            if not cdir.exists():
+                continue
+            files = sorted([p for p in cdir.iterdir() if p.is_file()])
+            for p in files:
+                items.append((str(p), self.class_to_idx[cname]))
+
+        rng = random.Random(seed)
+        rng.shuffle(items)
+
+        n = len(items)
+        n_val = int(n * val_ratio)
+        if split == "val":
+            self.items = items[:n_val]
+        elif split == "train":
+            self.items = items[n_val:]
+        else:
+            self.items = items
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, idx):
+        from PIL import Image
+        img_path, y = self.items[idx]
+        img = Image.open(img_path).convert("RGB")
+        img = self.transform(img)
+        return img, torch.tensor(y, dtype=torch.long), img_path
+
+
+def eval_anomalies(model, loader, device):
+    stats = defaultdict(lambda: {"count": 0, "correct": 0, "class_name": ""})
+
+    model.eval()
+    with torch.no_grad():
+        for imgs, labels, paths in loader:
+            imgs = imgs.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
+
+            out = model(imgs)
+            if "anomalies" not in out:
+                raise RuntimeError("model output does not contain 'anomalies' head")
+
+            pred = out["anomalies"].argmax(dim=1)
+
+            update_cls_stats(
+                stats,
+                labels.detach().cpu().tolist(),
+                pred.detach().cpu().tolist(),
+                ANOMALY_CLASSES,
+            )
+
+    overall, rows = summarize_cls_stats(stats, ANOMALY_CLASSES)
+    return {
+        "anomalies": {
+            "overall": overall,
+            "per_class": rows,
+        }
+    }
+
+
 def run_road_script(script_path, ckpt_path, output_dir):
     cmd = [
         sys.executable, script_path,
@@ -251,7 +327,7 @@ def run_road_script(script_path, ckpt_path, output_dir):
     subprocess.run(cmd, check=True)
 
 
-def write_summary_md(output_dir, ckpt_path, bdd_result, road_aux_json):
+def write_summary_md(output_dir, ckpt_path, bdd_result, road_aux_json, anomaly_result=None):
     lines = []
     lines.append("# Unified Evaluation Summary")
     lines.append("")
@@ -267,6 +343,13 @@ def write_summary_md(output_dir, ckpt_path, bdd_result, road_aux_json):
     lines.append("- drivable mIoU fg: {:.4f}".format(bdd_result["drivable"]["miou_fg"]))
     lines.append("- drivable foreground IoU: {:.4f}".format(bdd_result["drivable"]["foreground_iou"]))
     lines.append("")
+
+    if anomaly_result is not None:
+        lines.append("## Anomalies")
+        lines.append("")
+        lines.append("- anomalies acc: {:.4f}".format(anomaly_result["anomalies"]["overall"]))
+        lines.append("- anomaly file: `anomaly/anomaly_eval.json`")
+        lines.append("")
 
     if road_aux_json is not None:
         lines.append("## Road")
@@ -291,6 +374,7 @@ def main():
     parser.add_argument("--bdd_root", type=str, default="")
     parser.add_argument("--bdd_split", type=str, default="val", choices=["train", "val", "test"])
     parser.add_argument("--output_dir", type=str, default="eval_outputs/eval_all_heads")
+    parser.add_argument("--anomaly_root", type=str, default="")
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--num_workers", type=int, default=2)
     parser.add_argument("--skip_road", action="store_true")
@@ -300,6 +384,7 @@ def main():
     os.makedirs(os.path.join(args.output_dir, "bdd"), exist_ok=True)
     os.makedirs(os.path.join(args.output_dir, "road_aux"), exist_ok=True)
     os.makedirs(os.path.join(args.output_dir, "road_relaxed"), exist_ok=True)
+    os.makedirs(os.path.join(args.output_dir, "anomaly"), exist_ok=True)
 
     model, device, load_meta = load_infer_model(ckpt_path=args.ckpt_path)
 
@@ -342,6 +427,41 @@ def main():
     bdd_result.update(result_time_scene)
     bdd_result.update(result_visibility)
     bdd_result.update(result_drivable)
+
+    anomaly_result = None
+    if args.anomaly_root:
+        from utils.infer_utils import build_transform
+        ds_anomaly = AnomalyImageFolder(
+            root=args.anomaly_root,
+            transform=build_transform(),
+            split="val",
+        )
+        loader_anomaly = make_simple_loader(
+            ds_anomaly,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            collate_fn=None,
+        )
+        anomaly_result = eval_anomalies(model, loader_anomaly, device)
+
+        save_json(
+            {
+                "ckpt_path": args.ckpt_path,
+                "device": str(device),
+                "anomaly_root": args.anomaly_root,
+                "anomaly_result": anomaly_result,
+            },
+            os.path.join(args.output_dir, "anomaly", "anomaly_eval.json"),
+        )
+
+        save_text(
+            format_cls_block(
+                "Anomalies",
+                anomaly_result["anomalies"]["overall"],
+                anomaly_result["anomalies"]["per_class"],
+            ),
+            os.path.join(args.output_dir, "anomaly", "anomaly_eval.txt"),
+        )
 
     save_json(
         {
@@ -407,11 +527,14 @@ def main():
         ckpt_path=args.ckpt_path,
         bdd_result=bdd_result,
         road_aux_json=road_aux_json,
+        anomaly_result=anomaly_result,
     )
 
     print("saved all evaluation to:", args.output_dir)
     print("BDD json:", os.path.join(args.output_dir, "bdd", "bdd_eval.json"))
     print("BDD txt:", os.path.join(args.output_dir, "bdd", "bdd_eval.txt"))
+    if args.anomaly_root:
+        print("Anomaly dir:", os.path.join(args.output_dir, "anomaly"))
     if not args.skip_road:
         print("Road aux dir:", os.path.join(args.output_dir, "road_aux"))
         print("Road relaxed dir:", os.path.join(args.output_dir, "road_relaxed"))
