@@ -9,9 +9,11 @@ sys.path.insert(0, project_root)
 # Import your model functions
 from models.cloud_detection.clouds import process_clouds
 from models.glare.test_glare import evaluate_test_set
-from models.precip_model.infer import predict_weather
+from models.weather.infer import predict_weather
 from models.yuheng.run_predictions import run_predictions
 from models.yolo.traffic_workzone import process_traffic_workzone
+from models.synth.location import append_geoclip_location
+from models.synth.synth_data import generate_clip_sensors
 
 def run_pipeline():
     # Define your shared paths here so they are easy to update
@@ -22,6 +24,21 @@ def run_pipeline():
     print("========================================")
     print("   STARTING VISION ANALYSIS PIPELINE    ")
     print("========================================")
+    
+    # ---------------------------------------------------------
+    # 0. SYNTH SENSOR DATA
+    # ---------------------------------------------------------
+    print("\n[0/5] Synthesizing sensor data...")
+    synth_output_dir = os.path.join(OUTPUT_JSON, "synth_outputs")
+
+    generate_clip_sensors(
+        input_dir=INPUT_IMAGES, 
+        json_dir=synth_output_dir
+    )
+    append_geoclip_location(
+        input_dir=INPUT_IMAGES,
+        json_dir=synth_output_dir
+    )
 
     # ---------------------------------------------------------
     # 1. CLOUD DETECTION
@@ -52,7 +69,7 @@ def run_pipeline():
     # 3. WEATHER PREDICTION
     # ---------------------------------------------------------
     print("\n[3/5] Running Weather Prediction...")
-    weather_weights = os.path.join(project_root, "models", "precip_model", "weather_resnet18_best.pth")
+    weather_weights = os.path.join(project_root, "models", "weather", "weather_resnet18_best.pth")
     weather_output_dir = os.path.join(OUTPUT_JSON, "weather")
     
     predict_weather(

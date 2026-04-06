@@ -139,10 +139,29 @@ def main():
         # -------- Load pipeline outputs --------
         weather_data = load_json_data("weather", basename)
         cloud_data = load_json_data("cloud_detection", basename)
+        synth_data = load_json_data("synth_outputs", basename)  # Load new synth_outputs
         unified = load_unified_prediction(basename)
         yolo_data = load_yolo_prediction(basename)
 
         hud_lines = [f"FILE: {filename}", "-" * 30]
+
+        # -------- Synth Outputs (Sensors & Location) --------
+        if synth_data and "sensors" in synth_data:
+            s = synth_data["sensors"]
+            t_time = s.get("clock_time", "N/A")
+            t_temp = s.get("temperature_c", "N/A")
+            t_hum = s.get("humidity_pct", "N/A")
+            
+            hud_lines.append(f"SENSORS: Time {t_time} | Temp {t_temp}C | Hum {t_hum}%")
+            
+            loc = s.get("location", {})
+            if loc:
+                city = loc.get("nearest_city", "Unknown")
+                lat = loc.get("lat", "N/A")
+                lon = loc.get("lon", "N/A")
+                hud_lines.append(f"LOCATION: {city} (Lat:{lat}, Lon:{lon})")
+        else:
+            hud_lines.append("SENSORS: No Data")
 
         # -------- Weather --------
         if weather_data and "weather" in weather_data:
