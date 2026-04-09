@@ -17,8 +17,8 @@ venv/
 # output data
 data/*.jsonl
 data/yolo*/
-data/bdd100k_val/
-data/roadwork/
+data/bdd100k*/
+data/roadwork*/
 data/pre_aug_yolo_labels/
 runs/
 outputs/

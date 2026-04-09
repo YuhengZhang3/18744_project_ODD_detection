@@ -39,7 +39,7 @@ def main():
         data_config = yaml.safe_load(f)
     # data.yaml may contain path, images/val etc. Need to construct absolute path to val images
     # Assume data.yaml has 'val' field pointing to relative or absolute directory.
-    val_dir = Path(data_config['train'])
+    val_dir = Path(data_config['val'])
     if not val_dir.is_absolute():
         # If relative, resolve relative to the location of data.yaml or current dir.
         # We'll assume relative to data.yaml's directory.

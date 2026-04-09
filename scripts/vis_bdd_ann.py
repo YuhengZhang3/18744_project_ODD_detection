@@ -82,9 +82,9 @@ def main():
             else:
                 color = (255, 0, 0)  # blue for others
 
-            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+            cv2.rectangle(img, (x1, y1), (x2, y2), color, 3)
             cv2.putText(img, category, (x1, max(y1-5, 15)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 3)
 
     # Save output
     output_path = img_path.with_stem(img_path.stem + '_viz').with_suffix('.jpg')
