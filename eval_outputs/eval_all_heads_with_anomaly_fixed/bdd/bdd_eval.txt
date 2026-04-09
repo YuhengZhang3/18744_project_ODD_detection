@@ -1,0 +1,31 @@
+BDD time
+overall acc: 0.8982
+   0 (dawn/dusk           ) acc=0.654  509/778
+   1 (daytime             ) acc=0.876  4607/5258
+   2 (night               ) acc=0.978  3841/3929
+   3 (undefined           ) acc=0.714  25/35
+
+BDD scene
+overall acc: 0.7018
+   0 (city street         ) acc=0.635  3881/6112
+   1 (gas stations        ) acc=0.429  3/7
+   2 (highway             ) acc=0.796  1990/2499
+   3 (parking lot         ) acc=0.735  36/49
+   4 (residential         ) acc=0.856  1073/1253
+   5 (tunnel              ) acc=0.852  23/27
+   6 (undefined           ) acc=0.226  12/53
+
+BDD visibility
+overall acc: 0.8703
+   0 (poor                ) acc=0.799  1794/2245
+   1 (medium              ) acc=0.706  814/1153
+   2 (good                ) acc=0.923  6095/6602
+
+BDD drivable
+mIoU all: 0.6744
+mIoU fg: 0.5460
+foreground IoU: 0.4205
+per class:
+  background: 0.9313
+  alternative_drivable: 0.6715
+  direct_drivable: 0.4205

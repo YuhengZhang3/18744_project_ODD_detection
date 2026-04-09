@@ -1,18 +1,42 @@
-# python stuff
+# checkpoints
+checkpoints_road_coarse_to_fine/
+checkpoints_anomaly_head/
+checkpoints*/
+*.pt
+*.pth
+
+# keep final eval outputs and key cache
+!cache/
+!cache/hard_weight_cache/
+!cache/hard_weight_cache/rscd_train_sample_weights.pt
+
+!eval_outputs/
+!eval_outputs/eval_all_heads_coarse_to_fine/
+!eval_outputs/eval_all_heads_coarse_to_fine/**
+!eval_outputs/eval_all_heads_with_anomaly_fixed/
+!eval_outputs/eval_all_heads_with_anomaly_fixed/**
+
+# local datasets
+anomalies_odd_extreme_raw/
+anomalies_odd_extreme_raw.zip
+datasets/
+data_local/
+
+# generated outputs
+infer_outputs/
+logs*
+analysis/
+
+# python cache
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-*.log
-*.tmp
-.env
-.venv
-venv/
-.idea/
+
+# mac files
+.DS_Store
+
 
 # meta files
 .vscode/
-.DS_Store
 
 # output data
 data/*.jsonl
@@ -21,8 +45,3 @@ data/bdd100k*/
 data/roadwork*/
 data/pre_aug_yolo_labels/
 runs/
-outputs/
-checkpoints/
-source_images/checkpoints_time_scene/
-*.pt
-*.png
