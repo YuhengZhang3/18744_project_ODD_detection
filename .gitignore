@@ -30,18 +30,29 @@ analysis/
 # python cache
 __pycache__/
 *.pyc
-
-# mac files
-.DS_Store
-
+*.pyo
+*.pyd
+*.log
+*.tmp
+.env
+.venv
+venv/
+.idea/
+**/__pycache__
 
 # meta files
 .vscode/
 
 # output data
+datasets/
 data/*.jsonl
 data/yolo*/
 data/bdd100k*/
 data/roadwork*/
 data/pre_aug_yolo_labels/
 runs/
+source_images_old/
+output_json/
+
+# large files
+*.tar.gz
