@@ -45,14 +45,17 @@ venv/
 
 # output data
 datasets/
+data/ACDC_val
 data/*.jsonl
 data/yolo*/
 data/bdd100k*/
 data/roadwork*/
 data/pre_aug_yolo_labels/
 runs/
+source_images/
 source_images_old/
 output_json/
+stage1_output/
 
 # large files
 *.tar.gz

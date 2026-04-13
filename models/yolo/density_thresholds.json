@@ -1,10 +1,10 @@
 {
   "car": {
-    "max_count": 42.0,
-    "max_area_ratio": 0.39090384497907393
+    "max_count": 17.0,
+    "max_area_ratio": 0.2794646187598507
   },
   "pedestrian": {
-    "max_count": 13.0,
+    "max_count": 10.0,
     "max_area_ratio": 0.1
   },
   "bicycle": {

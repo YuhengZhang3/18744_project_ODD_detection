@@ -41,7 +41,7 @@ class TrafficWorkzoneAnalyzer:
         self.CAR_CLASS_IDS = [self._get_class_id('vehicle')]
         self.PEDESTRIAN_CLASS_IDS = [self._get_class_id('pedestrian')]
         self.BICYCLE_CLASS_IDS = [self._get_class_id('bicycle')]
-        self.WORKZONE_CLASS_IDS = [3, 4, 5]
+        self.WORKZONE_CLASS_IDS = [3, 4, 5, 6]
         self.WORKZONE_CLASS_NAMES = [self.class_names[idx] for idx in self.WORKZONE_CLASS_IDS if idx < len(self.class_names)]
 
         if any(idx is None for idx in self.CAR_CLASS_IDS + self.PEDESTRIAN_CLASS_IDS + self.BICYCLE_CLASS_IDS):
@@ -59,8 +59,8 @@ class TrafficWorkzoneAnalyzer:
         else:
             print("no threshold provided, use default density factors")
 
-        # Alpha for combining count and area (fixed 0.5, can be made configurable)
-        self.alpha = 0.5
+        # Alpha for combining count and area (can be made configurable)
+        self.alpha = 0.3
 
     def _get_class_id(self, name: str) -> Optional[int]:
         for idx, class_name in self.class_names.items():
@@ -177,9 +177,9 @@ class TrafficWorkzoneAnalyzer:
             total_workzone_area += (x2 - x1) * (y2 - y1)
         
         area_percentage = total_workzone_area / image_area
-        # New Rule: If total workzone area exceeds 30% of image area, it's a workzone
+        # New Rule: If total workzone area exceeds 50% of image area, it's a workzone
         # I added this rule because we need ways to identify large fences that may only be one single instance
-        if image_area > 0 and area_percentage >= 0.30:
+        if image_area > 0 and area_percentage >= 0.50:
             return True
 
         # Original Rule 1: At least three instances
@@ -191,10 +191,8 @@ class TrafficWorkzoneAnalyzer:
         if len(unique_categories) < 2:
             return False
 
-        # Original Rule 3: Occupy at least 5% of the image area
-        # NOTE: this is a little different from ROADwork, I decided to lower this value 10% was too high for small workzone barriers
-        # and plus, we counted work vehicles as normal vehicles, which further reduces our workzone object area
-        if image_area > 0 and area_percentage < 0.05:
+        # Original Rule 3: Occupy at least 10% of the image area
+        if image_area > 0 and area_percentage < 0.10:
             return False
 
         return True
@@ -220,7 +218,6 @@ def process_traffic_workzone(input_dir, json_dir, model_path, thresholds_path=No
         json_path = Path(json_dir) / (img_path.stem + '.json')
         with open(json_path, 'w') as f:
             json.dump(output, f, indent=2)
-
 
 # for local testing
 if __name__ == '__main__':

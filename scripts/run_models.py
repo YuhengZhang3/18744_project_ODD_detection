@@ -18,79 +18,79 @@ from models.synth.synth_data import generate_clip_sensors
 def run_pipeline():
     # Define your shared paths here so they are easy to update
     INPUT_IMAGES = os.path.join(project_root, "source_images")
-    OUTPUT_JSON = os.path.join(project_root, "outputs")
+    OUTPUT_JSON = os.path.join(project_root, "stage1_outputs")
     OUTPUT_BOXES = os.path.join(project_root, "models", "cloud_detection", "output_boxes")
     
     print("========================================")
     print("   STARTING VISION ANALYSIS PIPELINE    ")
     print("========================================")
     
-    # ---------------------------------------------------------
-    # 0. SYNTH SENSOR DATA
-    # ---------------------------------------------------------
-    print("\n[0/5] Synthesizing sensor data...")
-    synth_output_dir = os.path.join(OUTPUT_JSON, "synth_outputs")
+    # # ---------------------------------------------------------
+    # # 0. SYNTH SENSOR DATA
+    # # ---------------------------------------------------------
+    # print("\n[0/5] Synthesizing sensor data...")
+    # synth_output_dir = os.path.join(OUTPUT_JSON, "synth_outputs")
 
-    generate_clip_sensors(
-        input_dir=INPUT_IMAGES, 
-        json_dir=synth_output_dir
-    )
-    append_geoclip_location(
-        input_dir=INPUT_IMAGES,
-        json_dir=synth_output_dir
-    )
+    # generate_clip_sensors(
+    #     input_dir=INPUT_IMAGES, 
+    #     json_dir=synth_output_dir
+    # )
+    # append_geoclip_location(
+    #     input_dir=INPUT_IMAGES,
+    #     json_dir=synth_output_dir
+    # )
 
-    # ---------------------------------------------------------
-    # 1. CLOUD DETECTION
-    # ---------------------------------------------------------
-    print("\n[1/5] Running Cloud Detection...")
-    cloud_output_dir = os.path.join(OUTPUT_JSON, "cloud_detection")
+    # # ---------------------------------------------------------
+    # # 1. CLOUD DETECTION
+    # # ---------------------------------------------------------
+    # print("\n[1/5] Running Cloud Detection...")
+    # cloud_output_dir = os.path.join(OUTPUT_JSON, "cloud_detection")
 
-    process_clouds(
-        input_dir=INPUT_IMAGES,
-        output_dir=OUTPUT_BOXES,
-        json_dir=cloud_output_dir
-    )
+    # process_clouds(
+    #     input_dir=INPUT_IMAGES,
+    #     output_dir=OUTPUT_BOXES,
+    #     json_dir=cloud_output_dir
+    # )
 
-    # ---------------------------------------------------------
-    # 2. GLARE EVALUATION
-    # ---------------------------------------------------------
-    print("\n[2/5] Running Glare Evaluation...")
-    glare_model = os.path.join(project_root, "models", "glare", "custom_glare_model")
-    glare_output_dir = os.path.join(OUTPUT_JSON, "glare")
+    # # ---------------------------------------------------------
+    # # 2. GLARE EVALUATION
+    # # ---------------------------------------------------------
+    # print("\n[2/5] Running Glare Evaluation...")
+    # glare_model = os.path.join(project_root, "models", "glare", "custom_glare_model")
+    # glare_output_dir = os.path.join(OUTPUT_JSON, "glare")
     
-    evaluate_test_set(
-        model_dir=glare_model,
-        test_dir=INPUT_IMAGES,
-        output_dir=glare_output_dir
-    )
+    # evaluate_test_set(
+    #     model_dir=glare_model,
+    #     test_dir=INPUT_IMAGES,
+    #     output_dir=glare_output_dir
+    # )
 
-    # ---------------------------------------------------------
-    # 3. WEATHER PREDICTION
-    # ---------------------------------------------------------
-    print("\n[3/5] Running Weather Prediction...")
-    weather_weights = os.path.join(project_root, "models", "weather", "weather_resnet18_best.pth")
-    weather_output_dir = os.path.join(OUTPUT_JSON, "weather")
+    # # ---------------------------------------------------------
+    # # 3. WEATHER PREDICTION
+    # # ---------------------------------------------------------
+    # print("\n[3/5] Running Weather Prediction...")
+    # weather_weights = os.path.join(project_root, "models", "weather", "weather_resnet18_best.pth")
+    # weather_output_dir = os.path.join(OUTPUT_JSON, "weather")
     
-    predict_weather(
-        input_dir=INPUT_IMAGES,
-        json_dir=weather_output_dir,
-        model_path=weather_weights
-    )
+    # predict_weather(
+    #     input_dir=INPUT_IMAGES,
+    #     json_dir=weather_output_dir,
+    #     model_path=weather_weights
+    # )
     
-    # ---------------------------------------------------------
-    # 4. BDD100k EVALUATION
-    # ---------------------------------------------------------
-    print("\n[4/5] Running BDD100k Evaluation...")
-    yuheng_output_dir = os.path.join(OUTPUT_JSON, "yuheng")
+    # # ---------------------------------------------------------
+    # # 4. BDD100k EVALUATION
+    # # ---------------------------------------------------------
+    # print("\n[4/5] Running BDD100k Evaluation...")
+    # yuheng_output_dir = os.path.join(OUTPUT_JSON, "yuheng")
     
-    run_predictions(
-        source_directory=INPUT_IMAGES,
-        output_json_directory=yuheng_output_dir,
-        checkpoint_path="models/yuheng/stage2_best.pt",
-        drivable_label_directory=None,
-        limit=None
-    )
+    # run_predictions(
+    #     source_directory=INPUT_IMAGES,
+    #     output_json_directory=yuheng_output_dir,
+    #     checkpoint_path="models/yuheng/odd_full_infer_best.pt",
+    #     drivable_label_directory=None,
+    #     limit=None
+    # )
     
     # ---------------------------------------------------------
     # 5. YOLO
@@ -101,7 +101,7 @@ def run_pipeline():
     process_traffic_workzone(
         input_dir=INPUT_IMAGES,
         json_dir=yolo_output_dir,
-        model_path="models/yolo/18744_project_ODD_detection_runs_detect_yolo_stage2_weights_best.pt",
+        model_path="models/yolo/yolo_traffic_workzone.pt",
         thresholds_path="models/yolo/density_thresholds.json"
     )
 

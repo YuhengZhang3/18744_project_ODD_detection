@@ -22,11 +22,17 @@ roadwork_traj_src_root = data_root / "roadwork_traj"          # images/  traj_an
 roadwork_traj_train_json = roadwork_traj_src_root / "traj_annotations" / "trajectories_train_equidistant.json"
 roadwork_traj_val_json = roadwork_traj_src_root / "traj_annotations" / "trajectories_val_equidistant.json"
 
+pittsburgh_root = data_root / "roadwork_main"
+pittsburgh_train_json = pittsburgh_root / "annotations" / "instances_train_pittsburgh_only.json"
+pittsburgh_val_json = pittsburgh_root / "annotations" / "instances_val_pittsburgh_only.json"
+pittsburgh_img_root = pittsburgh_root / "images"
 
 # bdd100k val set, I split this further into training set and validating set for yolo
 bdd_src_root = data_root / "bdd100k_val"            # images/  labels/
 bdd_json_dir = bdd_src_root / "labels"              # JSON 
 
+bdd_bikes_root = data_root / "bdd100k_bikes"
+bdd_bikes_json_dir = bdd_bikes_root / "labels"
 
 yolo_root = data_root / "yolo"
 
@@ -98,10 +104,7 @@ if bdd_json_dir.exists():
 else:
     print(f"BDD directory not found: {bdd_json_dir}")
 
-# 4. BDD bikes, for simplicity, add all to training set
-# 4. BDD 自行车图片（划分 train/val）
-bdd_bikes_root = data_root / "bdd100k_bikes"
-bdd_bikes_json_dir = bdd_bikes_root / "labels"
+# 4. BDD bikes
 if bdd_bikes_json_dir.exists():
     bike_json_files = list(bdd_bikes_json_dir.glob("*.json"))
     if bike_json_files:
@@ -133,11 +136,6 @@ if bdd_bikes_json_dir.exists():
         print("BDD bikes added.")
 
 # 5. Pittsburgh ROADWork COCO dataset (train/val)
-pittsburgh_root = data_root / "roadwork_main"
-pittsburgh_train_json = pittsburgh_root / "annotations" / "instances_train_pittsburgh_only.json"
-pittsburgh_val_json = pittsburgh_root / "annotations" / "instances_val_pittsburgh_only.json"
-pittsburgh_img_root = pittsburgh_root / "images"
-
 if pittsburgh_train_json.exists():
     print("Converting Pittsburgh train...")
     converter = CocoRoadWorkConverter(

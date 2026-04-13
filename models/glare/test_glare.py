@@ -1,6 +1,7 @@
 import os
 import cv2
 import glob
+import json
 import torch
 import numpy as np
 from transformers import SegformerForSemanticSegmentation
@@ -55,13 +56,22 @@ def evaluate_test_set(model_dir="custom_glare_model", test_dir="../../source_ima
         # 5. Convert to a pure binary mask (Background = 0, Glare = 255)
         mask_img = (predicted_mask * 255).astype(np.uint8)
 
-        # 6. Save ONLY the mask as a lossless PNG
+        # 6. Compute glare_ratio (fraction of image pixels classified as glare)
+        total_pixels = predicted_mask.shape[0] * predicted_mask.shape[1]
+        glare_pixels = int(predicted_mask.sum())
+        glare_ratio = round(glare_pixels / total_pixels, 4) if total_pixels > 0 else 0.0
+
+        # 7. Save mask as PNG and glare_ratio as JSON
         filename = os.path.basename(img_path)
         basename = os.path.splitext(filename)[0]
         output_filename = os.path.join(output_dir, f"{basename}.png")
+        json_filename = os.path.join(output_dir, f"{basename}.json")
         
         cv2.imwrite(output_filename, mask_img)
-        print(f"Processed and saved mask: {output_filename}")
+        with open(json_filename, 'w') as f:
+            json.dump({"glare_ratio": glare_ratio}, f, indent=4)
+
+        print(f"Processed: {output_filename} | Glare ratio: {glare_ratio:.4f}")
 
     print(f"\nDone! Check the '{output_dir}' folder to review the isolated glare masks.")
 

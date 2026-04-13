@@ -13,6 +13,7 @@ from data.rscd_dataset import RSCD_CLASSES
 
 
 VIS_CLASSES = ["poor", "medium", "good"]
+ANOM_CLASSES = ["none", "extreme_weather", "road_blockage_hazard", "road_structure_failure"]
 
 
 def run_predictions(
@@ -57,7 +58,8 @@ def run_predictions(
         probs = F.softmax(logits, dim=1)[0]
         idx = int(torch.argmax(probs).item())
         conf = float(probs[idx].item())
-        return class_names[idx], conf
+        probs_list = [round(float(p), 4) for p in probs]
+        return class_names[idx], conf, probs_list
 
     def make_mask_path(image_path):
         if drivable_label_directory is None:
@@ -163,10 +165,11 @@ def run_predictions(
             out_full = model(full_tensor)
             out_road = model(road_tensor)
 
-        pred_time, conf_time = predict_head(out_full["time"], TIME_CLASSES)
-        pred_scene, conf_scene = predict_head(out_full["scene"], SCENE_CLASSES)
-        pred_vis, conf_vis = predict_head(out_full["visibility"], VIS_CLASSES)
-        pred_road, conf_road = predict_head(out_road["road_condition"], RSCD_CLASSES)
+        pred_time, conf_time, probs_time = predict_head(out_full["time"], TIME_CLASSES)
+        pred_scene, conf_scene, probs_scene = predict_head(out_full["scene"], SCENE_CLASSES)
+        pred_vis, conf_vis, probs_vis = predict_head(out_full["visibility"], VIS_CLASSES)
+        pred_anom, conf_anom, probs_anom = predict_head(out_full["anomalies"], ANOM_CLASSES)
+        pred_road, conf_road, probs_road = predict_head(out_road["road_condition"], RSCD_CLASSES)
 
         result = {
             "image": img_path.name,
@@ -174,18 +177,27 @@ def run_predictions(
                 "time": {
                     "label": pred_time,
                     "confidence": round(conf_time, 4),
+                    "probabilities": probs_time,
                 },
                 "scene": {
                     "label": pred_scene,
                     "confidence": round(conf_scene, 4),
+                    "probabilities": probs_scene,
                 },
                 "visibility": {
                     "label": pred_vis,
                     "confidence": round(conf_vis, 4),
+                    "probabilities": probs_vis,
+                },
+                "anomalies": {
+                    "label": pred_anom,
+                    "confidence": round(conf_anom, 4),
+                    "probabilities": probs_anom,
                 },
                 "road_condition": {
                     "label": pred_road,
                     "confidence": round(conf_road, 4),
+                    "probabilities": probs_road,
                 },
             },
             "road_patch_box": {
@@ -206,5 +218,6 @@ def run_predictions(
             f"time={pred_time} ({conf_time:.3f}) | "
             f"scene={pred_scene} ({conf_scene:.3f}) | "
             f"vis={pred_vis} ({conf_vis:.3f}) | "
+            f"anom={pred_anom} ({conf_anom:.3f}) | "
             f"road={pred_road} ({conf_road:.3f})"
         )
