@@ -5,6 +5,7 @@ import random
 import torch
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
+    
 
 def generate_clip_sensors(input_dir="../../source_images", json_dir="output_json"):
     os.makedirs(json_dir, exist_ok=True)
@@ -14,22 +15,20 @@ def generate_clip_sensors(input_dir="../../source_images", json_dir="output_json
     for ext in ["*.jpg", "*.jpeg", "*.png"]:
         image_paths.extend(glob.glob(os.path.join(input_dir, ext)))
         image_paths.extend(glob.glob(os.path.join(input_dir, ext.upper())))
-
+ 
     if not image_paths:
         print(f"No images found in '{input_dir}'.")
         return
-
+ 
     # 2. Setup Device and CLIP Model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Loading CLIP model on {device.type.upper()}...")
     
-    # using pre-downloaded version instead ...
-    # model_id = "openai/clip-vit-large-patch14"
     model_id = os.path.join(os.path.dirname(__file__), "..", "..", "cache", "clip-vit-large-patch14")
-    processor = CLIPProcessor.from_pretrained(model_id, local_files_only=True)
-    model = CLIPModel.from_pretrained(model_id, local_files_only=True).to(device)
+    processor = CLIPProcessor.from_pretrained(model_id)
+    model = CLIPModel.from_pretrained(model_id).to(device)
     model.eval()
-
+ 
     # 3. Define the visual proxies for our sensors (Removed Traffic and Location)
     categories = {
         "time": [
@@ -51,11 +50,29 @@ def generate_clip_sensors(input_dir="../../source_images", json_dir="output_json
             "A dashcam photo of a very dense, foggy atmosphere"
         ]
     }
-
+ 
     print(f"Running CLIP inference to generate synthetic sensors for {len(image_paths)} images...")
-
-    # 4. Process Images
+ 
+    # 4. Flatten all prompts for single-pass inference
+    category_names = list(categories.keys())
+    all_prompts = []
+    category_slices = {}  # maps category -> (start_idx, end_idx) in all_prompts
+    for cat in category_names:
+        start = len(all_prompts)
+        all_prompts.extend(categories[cat])
+        category_slices[cat] = (start, len(all_prompts))
+    
+    # Pre-tokenize text once (shared across all images)
+    text_inputs = processor(text=all_prompts, return_tensors="pt", padding=True)
+    input_ids = text_inputs["input_ids"].to(device)
+    attention_mask = text_inputs["attention_mask"].to(device)
+    
+    # Encode text features once (reused for every image)
     with torch.no_grad():
+        text_outputs = model.text_model(input_ids=input_ids, attention_mask=attention_mask)
+        text_features = model.text_projection(text_outputs.pooler_output)
+        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+
         for img_path in image_paths:
             filename = os.path.basename(img_path)
             basename = os.path.splitext(filename)[0]
@@ -66,15 +83,22 @@ def generate_clip_sensors(input_dir="../../source_images", json_dir="output_json
                 print(f"Error loading {filename}: {e}")
                 continue
             
+            # Encode image once
+            img_inputs = processor(images=img_pil, return_tensors="pt")
+            pixel_values = img_inputs["pixel_values"].to(device)
+            vision_outputs = model.vision_model(pixel_values=pixel_values)
+            img_features = model.visual_projection(vision_outputs.pooler_output)
+            img_features = img_features / img_features.norm(dim=-1, keepdim=True)
+            
+            # Compute similarity with all 12 prompts at once
+            similarity = (img_features @ text_features.T).squeeze(0)
+            
             sensor_data = {}
             
-            # Evaluate all categories against the image
-            for category, prompts in categories.items():
-                inputs = processor(text=prompts, images=img_pil, return_tensors="pt", padding=True).to(device)
-                outputs = model(**inputs)
-                
-                # Get the index of the highest probability prompt
-                probs = outputs.logits_per_image.softmax(dim=1).squeeze().tolist()
+            for category in category_names:
+                start, end = category_slices[category]
+                cat_logits = similarity[start:end]
+                probs = cat_logits.softmax(dim=0).tolist()
                 best_idx = probs.index(max(probs))
                 
                 # --- Map CLIP's visual guess to bounded numerical data ---
@@ -110,7 +134,7 @@ def generate_clip_sensors(input_dir="../../source_images", json_dir="output_json
                         sensor_data["humidity_pct"] = round(random.uniform(71.0, 90.0), 1)
                     else:               # Foggy
                         sensor_data["humidity_pct"] = round(random.uniform(91.0, 100.0), 1)
-
+ 
             # 5. Save the inferred sensor data directly to JSON
             json_filename = f"{basename}.json"
             json_path = os.path.join(json_dir, json_filename)
@@ -123,6 +147,6 @@ def generate_clip_sensors(input_dir="../../source_images", json_dir="output_json
                 json.dump(output_data, f, indent=4)
                 
             print(f"Processed: {json_filename} | Time: {sensor_data['clock_time']} | Temp: {sensor_data['temperature_c']}°C | Humidity: {sensor_data['humidity_pct']}%")
-
+ 
 if __name__ == "__main__":
     generate_clip_sensors()

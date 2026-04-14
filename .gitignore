@@ -55,7 +55,7 @@ runs/
 source_images/
 source_images_old/
 output_json/
-stage1_output/
+stage1_outputs*
 
 # large files
 *.tar.gz

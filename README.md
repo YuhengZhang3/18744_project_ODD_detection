@@ -541,4 +541,41 @@ save_results_to_dir(
 )
 ```
 
+# 8. Stage 2 documentation starts below
+
+The merged **Stage1** inference script is located at scripts/run_models.py,
+
+## Preparation
+to run it you need to download the CLIP weights from the project root directory
+wget -c https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/model.safetensors -P ./cache/clip-vit-large-patch14/
+
+then, make sure the following weights are available:
+  models/custom_glare_model/config.json
+  models/custom_glare_model/model.safetensors
+  models/weather/weather_resnet18_best.pth
+  models/yolo/yolo_traffic_workzone.pt
+  models/yolo/density_thresholds.json
+  models/yuheng/odd_full_infer_best.pt
+
+your input images should be placed at source_images/
+acceptable formats are .jpg .jpeg .png
+
+## Visualization
+outputs are stored in stage1_outputs/, 
+one json per category per image, arranged in 6 separate directories 
+  cloud_detection/
+  glare/
+  synth_outputs/
+  weather/
+  yolo/
+  yuheng/
+corresponding to the 6 stages in run_models.py
+
+
+## Merging results
+Run scripts/join_jsons.py to merge the separate jsons into one single json per image,
+merged jsons are stored in stage1_outputs/merged_json/
+
+
+
 ---

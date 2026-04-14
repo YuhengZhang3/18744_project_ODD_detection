@@ -140,7 +140,8 @@ def run_predictions(
     model.eval()
 
     image_paths = []
-    for ext in ["*.jpg", "*.jpeg", "*.png"]:
+    # for ext in ["*.jpg", "*.jpeg", "*.png", "*.JPG"]:
+    for ext in ["*.JPG"]:
         image_paths.extend(sorted(source_directory.glob(ext)))
     image_paths = sorted(image_paths)
 

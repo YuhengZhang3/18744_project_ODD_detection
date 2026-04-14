@@ -4,7 +4,7 @@ import glob
 
 # Adjust project_root if you are running this from a different location
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-JSON_ROOT = os.path.join(project_root, "stage1_outputs")
+JSON_ROOT = os.path.join(project_root, "stage1_outputs_ACDC")
 MERGED_OUT_DIR = os.path.join(JSON_ROOT, "merged_json")
 
 def main():
@@ -20,7 +20,7 @@ def main():
     subdirs = [
         d for d in os.listdir(JSON_ROOT) 
         if os.path.isdir(os.path.join(JSON_ROOT, d)) 
-        and d not in ["glare", "merged_json"]
+        and d not in ["merged_json"]
     ]
     
     print(f"Directories to merge: {subdirs}")
