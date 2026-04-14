@@ -47,7 +47,7 @@ Meaning:
   - severe
 
 ## Anomaly branch
-A separate anomaly adapter is added on top of the shared backbone feature.  
+A separate anomaly adapter is added on top of the shared backbone feature.
 This branch only serves the anomaly head:
 
 - `anomalies`
@@ -58,12 +58,12 @@ Current anomaly classes:
 - `road_blockage_hazard`
 - `road_structure_failure`
 
-This design keeps the anomaly training isolated from the original BDD heads.  
+This design keeps the anomaly training isolated from the original BDD heads.
 During anomaly training, only:
 - `anomaly_adapter`
 - `heads["anomalies"]`
 
-are updated.  
+are updated.
 The backbone, BDD branch, road branch, and drivable head stay frozen.
 
 ---
@@ -71,7 +71,7 @@ The backbone, BDD branch, road branch, and drivable head stay frozen.
 # 2. Best training pipeline
 
 ## Stage A: multitask base model
-The earlier multitask model was trained first.  
+The earlier multitask model was trained first.
 This provides:
 - trained backbone
 - trained BDD heads
@@ -81,7 +81,7 @@ This provides:
 Important checkpoint used as the road branch starting point in the original project:
 - `checkpoints_multitask_v2_hardboost/best.pt`
 
-This checkpoint is not kept in the current clean folder.  
+This checkpoint is not kept in the current clean folder.
 The clean folder keeps only the final mainline checkpoint and the anomaly fine-tuned checkpoint.
 
 ## Stage B: road branch finetuning
@@ -193,7 +193,7 @@ The anomaly dataset was assembled from multiple public sources and manual curati
 - manually cleaned and regrouped into the four final categories
 - a separate `none` class was collected as non-anomalous negatives
 
-Earlier raw sources included public weather/disaster data such as DAWN and manually sampled images from public videos.  
+Earlier raw sources included public weather/disaster data such as DAWN and manually sampled images from public videos.
 After cleaning and regrouping, the final raw anomaly folder used for training is:
 
 - `anomalies_odd_extreme_raw/`
@@ -388,7 +388,7 @@ python scripts/eval_road_relaxed.py \
 ```
 
 ## Anomaly val-only quick check
-A simple anomaly validation check can be run with the anomaly dataset loader and the integrated checkpoint.  
+A simple anomaly validation check can be run with the anomaly dataset loader and the integrated checkpoint.
 This was used to verify the held-out validation accuracy of `0.9878`.
 
 ---
@@ -550,8 +550,8 @@ to run it you need to download the CLIP weights from the project root directory
 wget -c https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/model.safetensors -P ./cache/clip-vit-large-patch14/
 
 then, make sure the following weights are available:
-  models/custom_glare_model/config.json
-  models/custom_glare_model/model.safetensors
+  models/glare/custom_glare_model/config.json
+  models/glare/custom_glare_model/model.safetensors
   models/weather/weather_resnet18_best.pth
   models/yolo/yolo_traffic_workzone.pt
   models/yolo/density_thresholds.json
@@ -561,8 +561,8 @@ your input images should be placed at source_images/
 acceptable formats are .jpg .jpeg .png
 
 ## Visualization
-outputs are stored in stage1_outputs/, 
-one json per category per image, arranged in 6 separate directories 
+outputs are stored in stage1_outputs/,
+one json per category per image, arranged in 6 separate directories
   cloud_detection/
   glare/
   synth_outputs/
