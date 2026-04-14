@@ -4,7 +4,7 @@ import glob
 
 # Adjust project_root if you are running this from a different location
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-JSON_ROOT = os.path.join(project_root, "stage1_outputs_ACDC")
+JSON_ROOT = os.path.join(project_root, "stage1_outputs")
 MERGED_OUT_DIR = os.path.join(JSON_ROOT, "merged_json")
 
 def main():
