@@ -108,7 +108,7 @@ def run_pipeline():
     process_traffic_workzone(
         input_dir=INPUT_IMAGES,
         json_dir=yolo_output_dir,
-        model_path="models/yolo/18744_project_ODD_detection_runs_detect_yolo_stage2_weights_best.pt",
+        model_path="models/yolo/yolo_traffic_workzone.pt",
         thresholds_path="models/yolo/density_thresholds.json"
     )
  

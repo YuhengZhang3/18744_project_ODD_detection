@@ -24,7 +24,8 @@ def generate_clip_sensors(input_dir="../../source_images", json_dir="output_json
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Loading CLIP model on {device.type.upper()}...")
     
-    model_id = os.path.join(os.path.dirname(__file__), "..", "..", "cache", "clip-vit-large-patch14")
+    # Use the official Hub ID instead of a local path
+    model_id = "openai/clip-vit-large-patch14" 
     processor = CLIPProcessor.from_pretrained(model_id)
     model = CLIPModel.from_pretrained(model_id).to(device)
     model.eval()

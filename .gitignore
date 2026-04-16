@@ -24,6 +24,7 @@ data_local/
 
 # generated outputs
 infer_outputs/
+output/
 outputs/
 logs*
 analysis/

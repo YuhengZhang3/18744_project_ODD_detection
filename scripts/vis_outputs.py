@@ -9,43 +9,19 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 IMAGE_DIR = os.path.join(project_root, "source_images")
 JSON_ROOT = os.path.join(project_root, "outputs")
 
+# We now only need the merged directory for data, but still need the glare dir for the visual mask
+MERGED_DIR = os.path.join(JSON_ROOT, "merged_json")
 GLARE_DIR = os.path.join(JSON_ROOT, "glare")
-YUHENG_DIR = os.path.join(JSON_ROOT, "yuheng")
-YOLO_DIR = os.path.join(JSON_ROOT, "yolo")
 
-
-def load_json_data(subfolder, basename):
-    json_path = os.path.join(JSON_ROOT, subfolder, f"{basename}.json")
+def load_merged_data(basename):
+    json_path = os.path.join(MERGED_DIR, f"{basename}.json")
     if os.path.exists(json_path):
         try:
             with open(json_path, "r") as f:
                 return json.load(f)
         except json.JSONDecodeError:
-            return {"error": "Invalid JSON"}
-    return None
-
-
-def load_unified_prediction(basename):
-    json_path = os.path.join(YUHENG_DIR, f"{basename}.json")
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, "r") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            return None
-    return None
-
-
-def load_yolo_prediction(basename):
-    json_path = os.path.join(YOLO_DIR, f"{basename}.json")
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, "r") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            return None
-    return None
-
+            return {}
+    return {}
 
 def draw_hud(img, text_lines):
 
@@ -94,6 +70,10 @@ def main():
         print(f"No images found in {IMAGE_DIR}")
         return
 
+    if not os.path.exists(MERGED_DIR):
+        print(f"Warning: Merged JSON directory not found at {MERGED_DIR}.")
+        print("Make sure you've run the merge script!")
+
     print("========================================")
     print("        PIPELINE VIEWER STARTED         ")
     print("========================================")
@@ -116,11 +96,9 @@ def main():
         glare_mask_path = os.path.join(GLARE_DIR, f"{basename}.png")
 
         if os.path.exists(glare_mask_path):
-
             mask = cv2.imread(glare_mask_path, cv2.IMREAD_GRAYSCALE)
 
             if mask is not None:
-
                 if mask.shape[:2] != img.shape[:2]:
                     mask = cv2.resize(mask, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)
 
@@ -136,17 +114,20 @@ def main():
             scale = max_display_height / img.shape[0]
             img = cv2.resize(img, (int(img.shape[1] * scale), int(img.shape[0] * scale)))
 
-        # -------- Load pipeline outputs --------
-        weather_data = load_json_data("weather", basename)
-        cloud_data = load_json_data("cloud_detection", basename)
-        synth_data = load_json_data("synth_outputs", basename)  # Load new synth_outputs
-        unified = load_unified_prediction(basename)
-        yolo_data = load_yolo_prediction(basename)
+        # -------- Load pipeline outputs (Single File) --------
+        merged_data = load_merged_data(basename)
+        
+        synth_data = merged_data.get("synth_outputs") or {}
+        weather_data = merged_data.get("weather") or {}
+        unified = merged_data.get("yuheng") or {}
+        yolo_data = merged_data.get("yolo") or {}
+        cloud_data = merged_data.get("cloud_detection") or {}
+        glare_data = merged_data.get("glare") or {}
 
         hud_lines = [f"FILE: {filename}", "-" * 30]
 
         # -------- Synth Outputs (Sensors & Location) --------
-        if synth_data and "sensors" in synth_data:
+        if "sensors" in synth_data:
             s = synth_data["sensors"]
             t_time = s.get("clock_time", "N/A")
             t_temp = s.get("temperature_c", "N/A")
@@ -163,32 +144,33 @@ def main():
         else:
             hud_lines.append("SENSORS: No Data")
 
-        # -------- Weather --------
-        if weather_data and "weather" in weather_data:
-            w = weather_data["weather"]
-
-            hud_lines.append(
-                f"WEATHER: Fog({w.get('fog_severity',0):.2f}) "
-                f"Rain({w.get('rain_severity',0):.2f}) "
-                f"Snow({w.get('snow_severity',0):.2f})"
-            )
+        # -------- Weather (Robust Parsing) --------
+        if weather_data:
+            if "error" in weather_data:
+                hud_lines.append("WEATHER: Invalid JSON format")
+            else:
+                w = weather_data.get("weather", weather_data)
+                
+                if any(key in w for key in ["fog_severity", "rain_severity", "snow_severity"]):
+                    hud_lines.append(
+                        f"WEATHER: Fog({w.get('fog_severity',0):.2f}) "
+                        f"Rain({w.get('rain_severity',0):.2f}) "
+                        f"Snow({w.get('snow_severity',0):.2f})"
+                    )
+                else:
+                    hud_lines.append("WEATHER: Valid JSON, but keys missing")
         else:
             hud_lines.append("WEATHER: No Data")
 
         # -------- Unified ODD model --------
-        if unified and "predictions" in unified:
-
+        if "predictions" in unified:
             p = unified["predictions"]
-
             time = p["time"]["label"]
             time_conf = p["time"]["confidence"]
-
             scene = p["scene"]["label"]
             scene_conf = p["scene"]["confidence"]
-
             vis = p["visibility"]["label"]
             vis_conf = p["visibility"]["confidence"]
-
             road = p["road_condition"]["label"]
             road_conf = p["road_condition"]["confidence"]
 
@@ -202,7 +184,6 @@ def main():
 
         # -------- YOLO Traffic --------
         if yolo_data:
-
             car = yolo_data.get("car_density", 0)
             ped = yolo_data.get("pedestrian_density", 0)
             bike = yolo_data.get("bicycle_density", 0)
@@ -215,12 +196,17 @@ def main():
             hud_lines.append("TRAFFIC: No Data")
 
         # -------- Clouds --------
-        if cloud_data and "cloud_fraction" in cloud_data:
+        if "cloud_fraction" in cloud_data:
             hud_lines.append(f"CLOUDS: Fraction {cloud_data['cloud_fraction']:.3f}")
         else:
             hud_lines.append("CLOUDS: No Data")
 
-        hud_lines.append("GLARE: See overlay")
+        # -------- Glare --------
+        if "glare_percentage" in glare_data:
+            glare_pct = glare_data['glare_percentage'] * 100
+            hud_lines.append(f"GLARE: {glare_pct:.2f}% (See yellow overlay)")
+        else:
+            hud_lines.append("GLARE: Mask overlay only (No percentage data)")
 
         display_img = draw_hud(img, hud_lines)
 
