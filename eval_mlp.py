@@ -54,6 +54,7 @@ def main():
 
     # Extract val data
     val_indices = val_set.indices
+    print(f"First 5 val indices: {val_indices[:5]}")
     X_val = X[val_indices]
     Y_val = Y[val_indices]
 
