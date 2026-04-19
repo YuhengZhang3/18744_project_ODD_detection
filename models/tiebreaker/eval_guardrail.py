@@ -352,7 +352,7 @@ def print_metrics(metrics):
 # ============================================================
 # Stage 4: HTML sample report
 # ============================================================
-def encode_image_b64(path, max_bytes=500_000):
+def encode_image_b64(path, max_bytes=2_000_000):
     """Encode an image as base64 data URI. Returns empty string on failure."""
     try:
         if not path or not os.path.exists(path):
@@ -607,11 +607,34 @@ def main():
     post_argmax = post_road27.argmax(axis=1)
     changed_valid = np.where(valid_mask & (pre_argmax != post_argmax))[0]
 
-    # Sample up to html_samples, prefer ones where MLP was confident
-    # (rank by max(rain_prob, snow_prob) so we see decisive Guardrail calls)
-    conf_score = np.maximum(mlp_probs["rain"], mlp_probs["snow"])
-    ranked = changed_valid[np.argsort(-conf_score[changed_valid])]
-    selected = ranked[: args.html_samples]
+    # Dataset-balanced sampling: equal slots per dataset
+    conf_score = np.maximum(mlp_probs["rain"], np.maximum(mlp_probs["snow"], mlp_probs["fog"]))
+    per_ds = max(1, args.html_samples // 3)
+
+    ds_buckets = {"bdd": [], "acdc": [], "roadwork": []}
+    for idx in changed_valid:
+        ds = val_samples[idx][0]  # dataset name from rebuild_sample_list
+        ds_buckets[ds].append(idx)
+
+    selected = []
+    for ds_name in ["bdd", "acdc", "roadwork"]:
+        bucket = ds_buckets[ds_name]
+        ranked = sorted(bucket, key=lambda i: -conf_score[i])
+        selected.extend(ranked[:per_ds])
+        print(f"  HTML samples from {ds_name}: {min(len(bucket), per_ds)}/{len(bucket)} candidates")
+
+    # Fill remaining slots from any dataset if one is short
+    seen = set(selected)
+    remaining = args.html_samples - len(selected)
+    if remaining > 0:
+        all_ranked = sorted(changed_valid, key=lambda i: -conf_score[i])
+        for idx in all_ranked:
+            if idx not in seen:
+                selected.append(idx)
+                seen.add(idx)
+                remaining -= 1
+                if remaining <= 0:
+                    break
 
     report_samples = []
     for i in selected:

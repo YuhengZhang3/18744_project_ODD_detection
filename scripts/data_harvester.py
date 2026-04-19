@@ -59,65 +59,67 @@ def query_osm_context(lat, lon, radius=200):
     Returns 6-dim list: [City, Highway, Residential, Tunnel, GasStation, Parking]
     Each is 0 or 1. Returns all zeros on failure or unknown.
     """
-    cache_key = (round(lat, 4), round(lon, 4))
-    if cache_key in _osm_cache:
-        return _osm_cache[cache_key]
+    """This OSM is incredibly hard and unstable for accessing! Hardcoded to zeros."""
+    return [0.0] * 6
+    # cache_key = (round(lat, 4), round(lon, 4))
+    # if cache_key in _osm_cache:
+    #     return _osm_cache[cache_key]
 
-    one_hot = [0.0] * 6
+    # one_hot = [0.0] * 6
 
-    query = f"""
-    [out:json][timeout:10];
-    (
-      way["highway"](around:{radius},{lat},{lon});
-      node["amenity"="fuel"](around:{radius},{lat},{lon});
-      node["amenity"="parking"](around:{radius},{lat},{lon});
-    );
-    out tags;
-    """
+    # query = f"""
+    # [out:json][timeout:10];
+    # (
+    #   way["highway"](around:{radius},{lat},{lon});
+    #   node["amenity"="fuel"](around:{radius},{lat},{lon});
+    #   node["amenity"="parking"](around:{radius},{lat},{lon});
+    # );
+    # out tags;
+    # """
 
-    try:
-        resp = requests.post(
-            "https://overpass-api.de/api/interpreter",
-            data={"data": query},
-            timeout=15,
-        )
-        resp.raise_for_status()
-        elements = resp.json().get("elements", [])
-    except Exception:
-        _osm_cache[cache_key] = one_hot
-        return one_hot
+    # try:
+    #     resp = requests.post(
+    #         "https://overpass-api.de/api/interpreter",
+    #         data={"data": query},
+    #         timeout=15,
+    #     )
+    #     resp.raise_for_status()
+    #     elements = resp.json().get("elements", [])
+    # except Exception:
+    #     _osm_cache[cache_key] = one_hot
+    #     return one_hot
 
-    for el in elements:
-        tags = el.get("tags", {})
-        hw = tags.get("highway", "")
-        amenity = tags.get("amenity", "")
-        tunnel = tags.get("tunnel", "")
+    # for el in elements:
+    #     tags = el.get("tags", {})
+    #     hw = tags.get("highway", "")
+    #     amenity = tags.get("amenity", "")
+    #     tunnel = tags.get("tunnel", "")
 
-        # Highway classification
-        if hw in ("motorway", "motorway_link", "trunk", "trunk_link"):
-            one_hot[1] = 1.0  # highway
-        elif hw in ("primary", "secondary", "tertiary", "unclassified", "service"):
-            one_hot[0] = 1.0  # city
-        elif hw in ("residential", "living_street"):
-            one_hot[2] = 1.0  # residential
+    #     # Highway classification
+    #     if hw in ("motorway", "motorway_link", "trunk", "trunk_link"):
+    #         one_hot[1] = 1.0  # highway
+    #     elif hw in ("primary", "secondary", "tertiary", "unclassified", "service"):
+    #         one_hot[0] = 1.0  # city
+    #     elif hw in ("residential", "living_street"):
+    #         one_hot[2] = 1.0  # residential
 
-        # Tunnel
-        if tunnel == "yes":
-            one_hot[3] = 1.0
+    #     # Tunnel
+    #     if tunnel == "yes":
+    #         one_hot[3] = 1.0
 
-        # Gas station
-        if amenity == "fuel":
-            one_hot[4] = 1.0
+    #     # Gas station
+    #     if amenity == "fuel":
+    #         one_hot[4] = 1.0
 
-        # Parking
-        if amenity == "parking":
-            one_hot[5] = 1.0
+    #     # Parking
+    #     if amenity == "parking":
+    #         one_hot[5] = 1.0
 
-    _osm_cache[cache_key] = one_hot
+    # _osm_cache[cache_key] = one_hot
 
-    # Rate limit: be polite to Overpass
-    time_module.sleep(0.1)
-    return one_hot
+    # # Rate limit: be polite to Overpass
+    # time_module.sleep(0.1)
+    # return one_hot
 
 
 def save_osm_cache(path):
@@ -311,13 +313,19 @@ def build_x(merged, osm_cache_path=None):
     lat = loc.get("lat", None)
     lon = loc.get("lon", None)
     if lat is not None and lon is not None:
+        # print(f"querying {lat} and {lon}")
         osm = query_osm_context(lat, lon)
     else:
         osm = [0.0] * 6
     x.extend(osm)
 
-    # GeoCLIP confidence (1 dim)
-    x.append(loc.get("geoclip_confidence", 0.0))
+
+    # GeoCLIP confidence (1 dim) — DEAD FEATURE
+    # x.append(loc.get("geoclip_confidence", 0.0))
+    # Originally intended to gate OSM 6-dim one-hot, but OSM queries fail from
+    # lightning.ai. With OSM stuck at zeros, this confidence carries no useful
+    # signal on its own. Kept as 0 to preserve X_DIM=60 ABI with existing ckpt.
+    x.append(0.0)
 
     assert len(x) == X_DIM, f"Expected {X_DIM} dims, got {len(x)}"
     return x
