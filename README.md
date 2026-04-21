@@ -543,43 +543,248 @@ save_results_to_dir(
 
 # 8. Stage 2 documentation starts below
 
-The merged **Stage1** inference script is located at scripts/run_models.py,
+# Stage-2 Tiebreaker: Multi-Modal Post-Fusion for ODD Detection
+ 
+## Overview
+ 
+Stage-2 is a post-processing pipeline that corrects stage-1 vision model outputs using multi-modal feature fusion. It consists of two serial components:
+ 
+1. **MLP Tiebreaker** — a lightweight MLP (60→128→64→6 heads, ~20k params) that fuses stage-1 predictions with CLIP-inferred virtual sensor data (temperature, humidity, clock time) to correct weather, time-of-day, scene, and anomaly classifications.
+2. **Soft-Mask Guardrail** — a rule-based engine (no learned parameters) that uses MLP-corrected weather probabilities to reweight the 27-class road surface prediction and 3-class visibility prediction via plausibility masking.
+### Key Results (Validation Set, n=2965)
+ 
+| Head | Metric | Stage-1 | Stage-2 | Delta |
+|------|--------|---------|---------|-------|
+| Fog | F1 | 0.80 | 0.99 | +0.19 |
+| Rain | F1 | 0.30 | 0.81 | +0.51 |
+| Snow | F1 | 0.16 | 0.75 | +0.59 |
+| Time | Accuracy | 89.1% | 95.7% | +6.6% |
+| Scene | Accuracy | 71.6% | 83.3% | +11.7% |
+ 
+Results validated on ACDC-only subset (unambiguous labels): fog F1=0.995, rain F1=0.979, snow F1=0.988.
+ 
+---
+ 
+## Architecture
+ 
+```
+Stage-1 Models (6 models, unchanged)
+├── [0] CLIP + GeoCLIP virtual sensors (temperature, humidity, clock_time, location)
+├── [1] SegFormer cloud detection (cloud_fraction)
+├── [2] SegFormer glare detection (glare_ratio)
+├── [3] ResNet18 weather (fog/rain/snow severity)
+├── [4] DINOv2 ODD multi-head (time, scene, visibility, anomalies, road_condition, road_state)
+└── [5] YOLO11m (car/pedestrian/bicycle density, work_zone)
+         │
+         ▼
+    join_jsons.py → merged_json/*.json
+         │
+         ▼
+Stage-2 Post-Processing (new)
+├── MLP Tiebreaker
+│   ├── Input: 60-dim feature vector (53 effective, 7 deprecated)
+│   ├── Output: corrected fog/rain/snow (sigmoid), time/scene/anomalies (softmax)
+│   └── Checkpoint: models/tiebreaker/tiebreaker_best.pt
+└── Soft-Mask Guardrail
+    ├── Input: MLP weather probs + stage-1 road_condition(27) + visibility(3) softmax
+    ├── Method: plausibility vector × softmax → renormalize
+    └── Output: corrected road_condition(27), visibility(3), aggregated road_state(5)
+         │
+         ▼
+    merged_json/*.json  →  "stage2" field appended
+```
+ 
+### MLP Input Layout (60 dims)
+ 
+| Index | Content | Source |
+|-------|---------|--------|
+| [0] | cloud_fraction | SegFormer |
+| [1] | fog_severity | ResNet18 |
+| [2] | rain_severity | ResNet18 |
+| [3] | snow_severity | ResNet18 |
+| [4] | glare_ratio | SegFormer |
+| [5:9] | time softmax (4) | DINOv2 |
+| [9:16] | scene softmax (7) | DINOv2 |
+| [16:19] | visibility softmax (3) | DINOv2 |
+| [19:23] | anomalies softmax (4) | DINOv2 |
+| [23:50] | road_condition softmax (27) | DINOv2 |
+| [50] | temperature normalized | CLIP |
+| [51] | humidity normalized | CLIP |
+| [52] | clock_time normalized | CLIP |
+| [53:59] | OSM one-hot (6) | DEPRECATED — hardcoded 0 |
+| [59] | geoclip_confidence | DEPRECATED — hardcoded 0 |
+ 
+### Guardrail Parameters
+ 
+```
+α = 0.7   (rain suppression on dry state)
+β = 0.8   (rain boost on wet state, baseline 0.3)
+γ = 0.7   (rain boost on water state, no baseline)
+δ = 0.5   (snow-to-ice coupling)
+FLOOR = 0.2  (minimum plausibility for dry/wet/snow states only; water/ice have no floor)
+```
+ 
+Plausibility is normalized by class count per state to prevent states with more sub-classes (e.g., dry with 8) from dominating aggregated probability mass.
+ 
+---
+ 
+## File Structure
+ 
+```
+models/tiebreaker/
+├── tiebreaker_mlp.py        # MLP model definition (TiebreakerMLP)
+├── tiebreakers_guard.py     # Guardrail soft-mask logic
+├── tiebreaker_best.pt       # Trained MLP checkpoint
+├── eval_guardrail.py        # Guardrail evaluation (consistency + HTML report)
+└── eval_mlp.py              # MLP stage-1 vs stage-2 comparison
+ 
+scripts/
+├── data_harvester.py        # Assembles training data from 3 datasets → .pt
+├── run_models.py            # Full pipeline (stage-1 + merge + stage-2)
+├── infer_single.py          # Single-image inference (stage-1 + stage-2)
+└── join_jsons.py            # Legacy standalone merge script (now inlined in run_models.py)
+ 
+data/
+└── tiebreaker_train.pt      # Training data {X: [19772, 60], Y: [19772, 6]}
 
-## Preparation
-to run it you need to download the CLIP weights from the project root directory
-  - wget -c https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/model.safetensors -P ./cache/clip-vit-large-patch14/
+─ train_mlp.py             # MLP training script
+```
+ 
+---
+ 
+## Usage
+ 
+### Full Pipeline (Stage-1 + Stage-2)
+ 
+```bash
+# Place input images in source_images/
+python scripts/run_models.py
+# Output: outputs/merged_json/*.json (with "stage2" field)
+```
+ 
+### Single Image Inference
+ 
+```bash
+# Full pipeline on one image
+python scripts/infer_single.py path/to/image.jpg
+ 
+# Stage-2 only (skip stage-1, use existing merged JSON)
+# NOTE: You may need to modify the paths to the merged JSON to get this script working!
+python scripts/infer_single.py path/to/image.jpg --skip_stage1
+```
+ 
+### Evaluation
+ 
+```bash
+# MLP stage-1 vs stage-2 comparison
+python models/tiebreaker/eval_mlp.py
+ 
+# Guardrail evaluation (consistency checks + HTML report)
+python -m models.tiebreaker.eval_guardrail
+ 
+# Guardrail sanity check (synthetic scenarios)
+python -m models.tiebreaker.tiebreakers_guard
+```
+ 
+### Training
+ 
+```bash
+# Step 1: Harvest training data from 3 datasets
+python scripts/data_harvester.py --skip_osm
+ 
+# Step 2: Train MLP
+python scripts/train_mlp.py
+ 
+# Step 3: Copy checkpoint
+cp checkpoints_tiebreaker/tiebreaker_best.pt models/tiebreaker/tiebreaker_best.pt
+```
+ 
+---
+ 
+## Training Data
+ 
+Three datasets unified via per-head label masking (Y=-1 for missing labels):
+ 
+| Dataset | Samples | fog | rain | snow | time | scene | anomalies |
+|---------|---------|-----|------|------|------|-------|-----------|
+| BDD100K val | 10,000 | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
+| ACDC val | 2,356 | ✓ | ✓ | ✓ | partial | ✗ | ✗ |
+| ROADwork | 7,416 | ✗ | ✓ | ✓ | ✓ | partial | ✗ |
+ 
+Split: 85/15 train/val, seed=42. Val set: 2,965 samples.
+ 
+---
+ 
+## Known Limitations
+ 
+1. **CLIP virtual sensor noise** — CLIP-inferred temperature can be significantly inaccurate (e.g., estimating 6°C on a warm autumn day), causing false snow predictions. In production, real sensor inputs would eliminate this.
+2. **Guardrail cannot override saturated softmax** — Soft-mask reweighting uses multiplication; when stage-1 assigns >95% confidence to a single class, the plausibility ratio (~3-5x) is insufficient to flip the argmax. Potential future fix: temperature scaling before reweighting.
+3. **No direct GT for road_condition and visibility** — Evaluation relies on indirect proxies (weather-surface consistency checks, road_state cross-reference, manual inspection). Quantitative accuracy metrics are not available.
+4. **RSCD domain gap** — The 27-class road surface classifier was trained on close-up road images, not dashcam perspectives. Guardrail can correct the state-level prediction (dry→wet) but sub-class texture predictions (asphalt vs concrete) remain unreliable.
+5. **Label policy inconsistency** — BDD100K labels post-rain scenes as "rainy" while ACDC only labels active precipitation. Validated on ACDC-only subset to confirm improvements are not artifacts of label noise.
+6. **Deprecated features** — OSM 6-dim one-hot (Overpass API unreachable) and GeoCLIP confidence (meaningless without OSM) are hardcoded to zero. 7 of 60 input dimensions carry no signal.
+---
+ 
+## Output Format
+ 
+Stage-2 results are appended to each merged JSON under the `"stage2"` key. All existing fields are preserved unchanged.
+ 
+```json
+{
+    "cloud_detection": { "..." },
+    "glare": { "..." },
+    "synth_outputs": { "..." },
+    "weather": { "..." },
+    "yuheng": { "..." },
+    "yolo": { "..." },
+    "stage2": {
+        "weather_corrected": {
+            "fog": 0.001,
+            "rain": 0.951,
+            "snow": 0.003
+        },
+        "time_corrected": {
+            "label": "daytime",
+            "class_id": 1
+        },
+        "scene_corrected": {
+            "label": "city street",
+            "class_id": 0
+        },
+        "anomalies_corrected": {
+            "label": "none",
+            "class_id": 0
+        },
+        "road_condition_corrected": {
+            "label": "wet_asphalt_slight",
+            "class_id": 19,
+            "confidence": 0.547,
+            "probabilities": ["...27 floats..."]
+        },
+        "road_condition_aggregated": {
+            "dry": 0.221,
+            "wet": 0.604,
+            "water": 0.148,
+            "snow": 0.028,
+            "ice": 0.000
+        },
+        "visibility_corrected": {
+            "label": "poor",
+            "class_id": 0,
+            "confidence": 0.730,
+            "probabilities": [0.730, 0.048, 0.222]
+        }
+    }
+}
+```
+## Model Weights
 
-then, make sure the following weights are available:
-  - models/custom_glare_model/config.json
-  - models/custom_glare_model/model.safetensors
-  - models/weather/weather_resnet18_best.pth
-  - models/yolo/yolo_traffic_workzone.pt
-  - models/yolo/density_thresholds.json
-  - models/yuheng/odd_full_infer_best.pt
+Download YOLO weights, density threshold file and Tiebreaker weights from 
+https://drive.google.com/drive/folders/11kQnLEV514uu7eh7cqKJ21t7VdRhVbFI?usp=sharing
 
-YOLO weights are provided at:
-https://drive.google.com/file/d/1yX37lFKIJXzjlOikwwIhscE4kTl5jtzI/view?usp=sharing
+and place YOLO and density threshold files in models/yolo/,
 
-
-your input images should be placed at source_images/,
-acceptable formats are .jpg .jpeg .png
-
-## Visualization
-outputs are stored in stage1_outputs/, 
-one json per category per image, arranged in 6 separate directories 
-  - cloud_detection/
-  - glare/
-  - synth_outputs/
-  - weather/
-  - yolo/
-  - yuheng/
-corresponding to the 6 stages in run_models.py
-
-
-## Merging results
-Run scripts/join_jsons.py to merge the separate jsons into one single json per image,
-merged jsons are stored in stage1_outputs/merged_json/
-
+place Tiebreaker weights in models/tiebreaker.
 
 
 ---
