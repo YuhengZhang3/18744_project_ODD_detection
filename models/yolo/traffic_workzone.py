@@ -122,7 +122,7 @@ class TrafficWorkzoneAnalyzer:
             x1, y1, x2, y2 = bbox
             obj_area = (x2 - x1) * (y2 - y1)
 
-            if cls_id in self.CAR_CLASS_IDS:
+            if cls_id in self.CAR_CLASS_IDS or cls_id == 6:
                 counts['car'] += 1
                 areas['car'] += obj_area
             elif cls_id in self.PEDESTRIAN_CLASS_IDS:
