@@ -9,9 +9,9 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 IMAGE_DIR = os.path.join(project_root, "source_images")
 JSON_ROOT = os.path.join(project_root, "outputs")
 
-# We now only need the merged directory for data, but still need the glare dir for the visual mask
 MERGED_DIR = os.path.join(JSON_ROOT, "merged_json")
 GLARE_DIR = os.path.join(JSON_ROOT, "glare")
+
 
 def load_merged_data(basename):
     json_path = os.path.join(MERGED_DIR, f"{basename}.json")
@@ -23,37 +23,33 @@ def load_merged_data(basename):
             return {}
     return {}
 
-def draw_hud(img, text_lines):
 
-    if not text_lines:
-        return img
+# -------- NEW: SIDE PANEL INSTEAD OF OVERLAY --------
+def draw_side_panel(img, text_lines, panel_width=640):
+    h, w = img.shape[:2]
+
+    canvas = np.zeros((h, w + panel_width, 3), dtype=np.uint8)
+
+    # Left: image
+    canvas[:, :w] = img
+
+    # Right: panel background
+    canvas[:, w:] = (30, 30, 30)
 
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.6
+    font_scale = 0.55
     thickness = 1
-    line_spacing = 25
-    margin = 15
+    line_spacing = 22
 
-    max_text_width = max(
-        [cv2.getTextSize(line, font, font_scale, thickness)[0][0] for line in text_lines]
-    )
-
-    box_width = max_text_width + (margin * 2)
-    box_height = (len(text_lines) * line_spacing) + (margin * 2)
-
-    overlay = img.copy()
-    cv2.rectangle(overlay, (0, 0), (box_width, box_height), (0, 0, 0), -1)
-
-    alpha = 0.6
-    cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
-
-    y_offset = margin + 15
+    x = w + 15
+    y = 30
 
     for line in text_lines:
-        cv2.putText(img, line, (margin, y_offset), font, font_scale, (255, 255, 255), thickness)
-        y_offset += line_spacing
+        cv2.putText(canvas, line, (x, y),
+                    font, font_scale, (255, 255, 255), thickness)
+        y += line_spacing
 
-    return img
+    return canvas
 
 
 def main():
@@ -69,10 +65,6 @@ def main():
     if not image_paths:
         print(f"No images found in {IMAGE_DIR}")
         return
-
-    if not os.path.exists(MERGED_DIR):
-        print(f"Warning: Merged JSON directory not found at {MERGED_DIR}.")
-        print("Make sure you've run the merge script!")
 
     print("========================================")
     print("        PIPELINE VIEWER STARTED         ")
@@ -107,108 +99,165 @@ def main():
 
                 cv2.addWeighted(img, 0.7, overlay, 0.3, 0, img)
 
-        # -------- Resize for display --------
+        # -------- Resize --------
         max_display_height = 800
-
         if img.shape[0] > max_display_height:
             scale = max_display_height / img.shape[0]
             img = cv2.resize(img, (int(img.shape[1] * scale), int(img.shape[0] * scale)))
 
-        # -------- Load pipeline outputs (Single File) --------
+        # -------- Load Data --------
         merged_data = load_merged_data(basename)
-        
+
         synth_data = merged_data.get("synth_outputs") or {}
         weather_data = merged_data.get("weather") or {}
         unified = merged_data.get("yuheng") or {}
+        stage2 = merged_data.get("stage2") or {}
         yolo_data = merged_data.get("yolo") or {}
         cloud_data = merged_data.get("cloud_detection") or {}
         glare_data = merged_data.get("glare") or {}
 
-        hud_lines = [f"FILE: {filename}", "-" * 30]
+        hud_lines = [f"FILE: {filename}", "-" * 40]
 
-        # -------- Synth Outputs (Sensors & Location) --------
+        # -------- Sensors --------
         if "sensors" in synth_data:
             s = synth_data["sensors"]
-            t_time = s.get("clock_time", "N/A")
-            t_temp = s.get("temperature_c", "N/A")
-            t_hum = s.get("humidity_pct", "N/A")
-            
-            hud_lines.append(f"SENSORS: Time {t_time} | Temp {t_temp}C | Hum {t_hum}%")
-            
+
+            hud_lines.append(
+                f"SENSORS: {s.get('clock_time','N/A')} | "
+                f"{s.get('temperature_c','N/A')}C | "
+                f"{s.get('humidity_pct','N/A')}%"
+            )
+
             loc = s.get("location", {})
             if loc:
-                city = loc.get("nearest_city", "Unknown")
-                lat = loc.get("lat", "N/A")
-                lon = loc.get("lon", "N/A")
-                hud_lines.append(f"LOCATION: {city} (Lat:{lat}, Lon:{lon})")
+                hud_lines.append(
+                    f"LOC: {loc.get('nearest_city','Unknown')}"
+                )
         else:
             hud_lines.append("SENSORS: No Data")
 
-        # -------- Weather (Robust Parsing) --------
-        if weather_data:
-            if "error" in weather_data:
-                hud_lines.append("WEATHER: Invalid JSON format")
+        # -------- Weather --------
+        # -------- Weather (Merged Original + Corrected) --------
+        w = weather_data.get("weather", weather_data) if weather_data else {}
+        wc = stage2.get("weather_corrected", {})
+
+        def fmt_weather(orig_key, corr_key):
+            o = w.get(orig_key, None)
+            c = wc.get(corr_key, None)
+
+            if o is None and c is None:
+                return f"{orig_key.split('_')[0].upper()}: N/A"
+
+            if o is not None and c is not None:
+                return f"{orig_key.split('_')[0].upper()}: {o:.2f} -> {c:.2f}"
+            elif o is not None:
+                return f"{orig_key.split('_')[0].upper()}: {o:.2f}"
             else:
-                w = weather_data.get("weather", weather_data)
-                
-                if any(key in w for key in ["fog_severity", "rain_severity", "snow_severity"]):
-                    hud_lines.append(
-                        f"WEATHER: Fog({w.get('fog_severity',0):.2f}) "
-                        f"Rain({w.get('rain_severity',0):.2f}) "
-                        f"Snow({w.get('snow_severity',0):.2f})"
-                    )
-                else:
-                    hud_lines.append("WEATHER: Valid JSON, but keys missing")
+                return f"{orig_key.split('_')[0].upper()}: -> {c:.2f}"
+
+        if w or wc:
+            hud_lines.append("WEATHER:")
+
+            hud_lines.append(f"  {fmt_weather('fog_severity', 'fog')}")
+            hud_lines.append(f"  {fmt_weather('rain_severity', 'rain')}")
+            hud_lines.append(f"  {fmt_weather('snow_severity', 'snow')}")
         else:
             hud_lines.append("WEATHER: No Data")
 
-        # -------- Unified ODD model --------
-        if "predictions" in unified:
-            p = unified["predictions"]
-            time = p["time"]["label"]
-            time_conf = p["time"]["confidence"]
-            scene = p["scene"]["label"]
-            scene_conf = p["scene"]["confidence"]
-            vis = p["visibility"]["label"]
-            vis_conf = p["visibility"]["confidence"]
-            road = p["road_condition"]["label"]
-            road_conf = p["road_condition"]["confidence"]
+        # -------- Helper formatter --------
+        def fmt(orig, corr, show_conf=True):
+            if not orig:
+                return "N/A"
 
-            hud_lines.append(f"TIME: {time} ({time_conf:.2f})")
-            hud_lines.append(f"SCENE: {scene} ({scene_conf:.2f})")
-            hud_lines.append(f"VISIBILITY: {vis} ({vis_conf:.2f})")
-            hud_lines.append(f"ROAD: {road} ({road_conf:.2f})")
+            o_label = orig.get("label", "N/A")
+            o_conf = orig.get("confidence")
+
+            c_label = corr.get("label") if corr else None
+            c_conf = corr.get("confidence") if corr else None
+
+            if show_conf and o_conf is not None:
+                base = f"{o_label} ({o_conf:.2f})"
+            else:
+                base = f"{o_label}"
+
+            if corr:
+                if show_conf and c_conf is not None:
+                    return f"{base} → {c_label} ({c_conf:.2f})"
+                else:
+                    return f"{base} → {c_label}"
+            return base
+
+        # -------- ODD Model --------
+        pred = unified.get("prediction") or {}
+
+        if pred:
+            hud_lines.append("")
+            hud_lines.append("=== ODD MODEL ===")
+
+            def fmt_with_arrow(orig, corr, show_conf=True):
+                if not orig:
+                    return "N/A"
+
+                o_label = orig.get("label", "N/A")
+                o_conf = orig.get("confidence")
+
+                c_label = corr.get("label") if corr else None
+                c_conf = corr.get("confidence") if corr else None
+
+                # Base (original)
+                if show_conf and o_conf is not None:
+                    base = f"{o_label} ({o_conf:.2f})"
+                else:
+                    base = f"{o_label}"
+
+                # If no corrected
+                if not corr:
+                    return base
+
+                # Corrected part
+                if show_conf and c_conf is not None:
+                    corrected = f"{c_label} ({c_conf:.2f})"
+                else:
+                    corrected = f"{c_label}"
+                
+                return f"{base} -> {corrected}"
+
+            hud_lines.append(
+                f"TIME: {fmt_with_arrow(pred.get('time'), stage2.get('time_corrected'), False)}"
+            )
+            hud_lines.append(
+                f"SCENE: {fmt_with_arrow(pred.get('scene'), stage2.get('scene_corrected'), False)}"
+            )
+            hud_lines.append(
+                f"VIS: {fmt_with_arrow(pred.get('visibility'), stage2.get('visibility_corrected'))}"
+            )
+            hud_lines.append(
+                f"ROAD: {fmt_with_arrow(pred.get('road_condition_infer'), stage2.get('road_condition_corrected'))}"
+            )
 
         else:
             hud_lines.append("ODD MODEL: No Data")
 
-        # -------- YOLO Traffic --------
+        # -------- YOLO --------
         if yolo_data:
-            car = yolo_data.get("car_density", 0)
-            ped = yolo_data.get("pedestrian_density", 0)
-            bike = yolo_data.get("bicycle_density", 0)
-            wz = yolo_data.get("work_zone", False)
-
-            hud_lines.append(f"TRAFFIC: Car {car:.3f} Ped {ped:.3f} Bike {bike:.3f}")
-            hud_lines.append(f"WORK ZONE: {wz}")
-
-        else:
-            hud_lines.append("TRAFFIC: No Data")
+            hud_lines.append("")
+            hud_lines.append(
+                f"TRAFFIC: Car {yolo_data.get('car_density',0):.3f} "
+                f"Ped {yolo_data.get('pedestrian_density',0):.3f} "
+                f"Bike {yolo_data.get('bicycle_density',0):.3f}"
+            )
+            hud_lines.append(f"WORK_ZONE: {yolo_data.get('work_zone', False)}")
 
         # -------- Clouds --------
         if "cloud_fraction" in cloud_data:
-            hud_lines.append(f"CLOUDS: Fraction {cloud_data['cloud_fraction']:.3f}")
-        else:
-            hud_lines.append("CLOUDS: No Data")
+            hud_lines.append(f"CLOUDS: {cloud_data['cloud_fraction']:.2f}")
 
         # -------- Glare --------
-        if "glare_percentage" in glare_data:
-            glare_pct = glare_data['glare_percentage'] * 100
-            hud_lines.append(f"GLARE: {glare_pct:.2f}% (See yellow overlay)")
-        else:
-            hud_lines.append("GLARE: Mask overlay only (No percentage data)")
+        if "glare_ratio" in glare_data:
+            hud_lines.append(f"GLARE: {glare_data['glare_ratio']:.2f}")
 
-        display_img = draw_hud(img, hud_lines)
+        # -------- Draw --------
+        display_img = draw_side_panel(img, hud_lines)
 
         cv2.imshow("Vision Pipeline Viewer", display_img)
 

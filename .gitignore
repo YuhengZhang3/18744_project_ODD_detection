@@ -58,6 +58,7 @@ source_images/
 source_images_old/
 output_json/
 stage1_outputs*
+eval_guardrail_output/
 
 # large files
 *.tar.gz

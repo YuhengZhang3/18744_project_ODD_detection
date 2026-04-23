@@ -1,7 +1,8 @@
 import os
 import sys
 import json
- 
+import glob
+
 # Add the project root (one directory up from /scripts) to the Python path
 # so we can import from the 'models' directory cleanly.
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -15,11 +16,15 @@ from utils.infer_api import load_pipeline, infer_path
 from models.yolo.traffic_workzone import process_traffic_workzone
 from models.synth.location import append_geoclip_location
 from models.synth.synth_data import generate_clip_sensors
+from scripts.data_harvester import build_x
+from models.tiebreaker.tiebreaker_mlp import TiebreakerMLP
+from models.tiebreaker.tiebreakers_guard import run_guardrail, ROAD_COND_NAMES, aggregate_road_states
+
  
 def run_pipeline():
     # Define your shared paths here so they are easy to update
     INPUT_IMAGES = os.path.join(project_root, "source_images")
-    OUTPUT_JSON = os.path.join(project_root, "stage1_outputs")
+    OUTPUT_JSON = os.path.join(project_root, "outputs")
     OUTPUT_BOXES = os.path.join(project_root, "models", "cloud_detection", "output_boxes")
     
     print("========================================")
@@ -50,7 +55,8 @@ def run_pipeline():
     process_clouds(
         input_dir=INPUT_IMAGES,
         output_dir=OUTPUT_BOXES,
-        json_dir=cloud_output_dir
+        json_dir=cloud_output_dir,
+        save_vis=True
     )
  
     # ---------------------------------------------------------
@@ -63,7 +69,8 @@ def run_pipeline():
     evaluate_test_set(
         model_dir=glare_model,
         test_dir=INPUT_IMAGES,
-        output_dir=glare_output_dir
+        output_dir=glare_output_dir, 
+        save_mask=True
     )
  
     # ---------------------------------------------------------
@@ -111,6 +118,171 @@ def run_pipeline():
         model_path="models/yolo/yolo_traffic_workzone.pt",
         thresholds_path="models/yolo/density_thresholds.json"
     )
+
+    # ---------------------------------------------------------
+    # 6. JOIN JSONS
+    # ---------------------------------------------------------
+    print("\n[6/7] Merging stage-1 outputs...")
+    merged_dir = os.path.join(OUTPUT_JSON, "merged_json")
+    os.makedirs(merged_dir, exist_ok=True)
+
+    # Collect all sub-model output dirs
+    sub_dirs = [
+        os.path.join(OUTPUT_JSON, sub) for sub in
+        ["synth_outputs", "cloud_detection", "glare", "weather", "yuheng", "yolo"]
+    ]
+
+    # Merge by matching filenames across sub-dirs
+    all_basenames = set()
+    for sd in sub_dirs:
+        if os.path.isdir(sd):
+            for f in os.listdir(sd):
+                if f.endswith(".json"):
+                    all_basenames.add(os.path.splitext(f)[0])
+
+    merge_count = 0
+    for basename in sorted(all_basenames):
+        merged = {}
+        for sd in sub_dirs:
+            jf = os.path.join(sd, f"{basename}.json")
+            if os.path.exists(jf):
+                sub_name = os.path.basename(sd)
+                with open(jf, 'r') as f:
+                    merged[sub_name] = json.load(f)
+        out_path = os.path.join(merged_dir, f"{basename}.json")
+        with open(out_path, 'w') as f:
+            json.dump(merged, f, indent=2)
+        merge_count += 1
+
+    print(f"  Merged {merge_count} images -> {merged_dir}")
+
+    # ---------------------------------------------------------
+    # 7. STAGE-2: MLP Tiebreaker + Guardrail
+    # ---------------------------------------------------------
+    print("\n[7/7] Running Stage-2 (MLP Tiebreaker + Guardrail)...")
+
+    import numpy as np
+    import torch
+
+    # Load MLP
+    mlp_ckpt = os.path.join(project_root, "models", "tiebreaker", "tiebreaker_best.pt")
+    if not os.path.exists(mlp_ckpt):
+        print(f"  WARNING: MLP checkpoint not found at {mlp_ckpt}, skipping stage-2")
+    else:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = TiebreakerMLP()
+        state = torch.load(mlp_ckpt, map_location="cpu", weights_only=False)
+        if isinstance(state, dict) and "model" in state:
+            state = state["model"]
+        model.load_state_dict(state)
+        model.to(device)
+        model.eval()
+
+        # Batch process all merged JSONs
+        merged_files = sorted(glob.glob(os.path.join(merged_dir, "*.json")))
+        all_merged = []
+        valid_indices = []
+
+        for i, mf in enumerate(merged_files):
+            with open(mf, 'r') as f:
+                merged = json.load(f)
+            x = build_x(merged)
+            if x is not None:
+                all_merged.append((mf, merged))
+                valid_indices.append(len(all_merged) - 1)
+
+        if not all_merged:
+            print("  WARNING: No valid samples for stage-2")
+        else:
+            # Batched MLP forward
+            X = torch.tensor(
+                [build_x(m) for _, m in all_merged],
+                dtype=torch.float32
+            ).to(device)
+
+            with torch.no_grad():
+                out = model(X)
+
+            fog_probs  = torch.sigmoid(out["fog"]).cpu().numpy()
+            rain_probs = torch.sigmoid(out["rain"]).cpu().numpy()
+            snow_probs = torch.sigmoid(out["snow"]).cpu().numpy()
+            time_preds = out["time"].cpu().argmax(dim=1).numpy()
+            scene_preds = out["scene"].cpu().argmax(dim=1).numpy()
+            anomaly_preds = out["anomalies"].cpu().argmax(dim=1).numpy()
+
+            TIME_NAMES = ["dawn/dusk", "daytime", "night", "undefined"]
+            SCENE_NAMES = ["city street", "gas stations", "highway",
+                           "parking lot", "residential", "tunnel", "undefined"]
+            ANOMALY_NAMES = ["none", "extreme_weather", "road_blockage_hazard", "other"]
+
+            corrected_count = 0
+            for i, (mf, merged) in enumerate(all_merged):
+                p_fog = float(fog_probs[i])
+                p_rain = float(rain_probs[i])
+                p_snow = float(snow_probs[i])
+
+                # Get stage-1 softmax for Guardrail
+                pred = merged.get("yuheng", {}).get("prediction", {})
+                rc = pred.get("road_condition_infer") or pred.get("road_condition_direct")
+                vis = pred.get("visibility")
+
+                guardrail_result = None
+                if rc and vis:
+                    s1_road27 = np.array(rc["probabilities"], dtype=np.float32)
+                    s1_vis3 = np.array(vis["probabilities"], dtype=np.float32)
+                    if s1_road27.shape == (27,) and s1_vis3.shape == (3,):
+                        guardrail_result = run_guardrail(
+                            s1_road27, s1_vis3, p_fog, p_rain, p_snow
+                        )
+
+                # Build stage-2 correction block
+                stage2 = {
+                    "weather_corrected": {
+                        "fog": p_fog,
+                        "rain": p_rain,
+                        "snow": p_snow,
+                    },
+                    "time_corrected": {
+                        "label": TIME_NAMES[int(time_preds[i])],
+                        "class_id": int(time_preds[i]),
+                    },
+                    "scene_corrected": {
+                        "label": SCENE_NAMES[int(scene_preds[i])],
+                        "class_id": int(scene_preds[i]),
+                    },
+                    "anomalies_corrected": {
+                        "label": ANOMALY_NAMES[int(anomaly_preds[i])],
+                        "class_id": int(anomaly_preds[i]),
+                    },
+                }
+
+                if guardrail_result is not None:
+                    rc_corr = guardrail_result["road_condition_corrected"]
+                    vis_corr = guardrail_result["visibility_corrected"]
+                    rc_top = int(np.argmax(rc_corr))
+                    vis_top = int(np.argmax(vis_corr))
+
+                    stage2["road_condition_corrected"] = {
+                        "label": ROAD_COND_NAMES[rc_top],
+                        "class_id": rc_top,
+                        "confidence": float(rc_corr[rc_top]),
+                        "probabilities": rc_corr.tolist(),
+                    }
+                    stage2["road_condition_aggregated"] = guardrail_result["road_condition_aggregated"]
+                    stage2["visibility_corrected"] = {
+                        "label": ["poor", "medium", "good"][vis_top],
+                        "class_id": vis_top,
+                        "confidence": float(vis_corr[vis_top]),
+                        "probabilities": vis_corr.tolist(),
+                    }
+
+                # Write back: add stage2 block, don't touch anything else
+                merged["stage2"] = stage2
+                with open(mf, 'w') as f:
+                    json.dump(merged, f, indent=2)
+                corrected_count += 1
+
+            print(f"  Stage-2 corrections applied to {corrected_count} images")
  
     print("\n========================================")
     print("         PIPELINE COMPLETE!             ")
