@@ -24,16 +24,12 @@ def load_merged_data(basename):
     return {}
 
 
-# -------- NEW: SIDE PANEL INSTEAD OF OVERLAY --------
 def draw_side_panel(img, text_lines, panel_width=640):
     h, w = img.shape[:2]
 
     canvas = np.zeros((h, w + panel_width, 3), dtype=np.uint8)
 
-    # Left: image
     canvas[:, :w] = img
-
-    # Right: panel background
     canvas[:, w:] = (30, 30, 30)
 
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -130,14 +126,11 @@ def main():
 
             loc = s.get("location", {})
             if loc:
-                hud_lines.append(
-                    f"LOC: {loc.get('nearest_city','Unknown')}"
-                )
+                hud_lines.append(f"LOC: {loc.get('nearest_city','Unknown')}")
         else:
             hud_lines.append("SENSORS: No Data")
 
         # -------- Weather --------
-        # -------- Weather (Merged Original + Corrected) --------
         w = weather_data.get("weather", weather_data) if weather_data else {}
         wc = stage2.get("weather_corrected", {})
 
@@ -157,7 +150,6 @@ def main():
 
         if w or wc:
             hud_lines.append("WEATHER:")
-
             hud_lines.append(f"  {fmt_weather('fog_severity', 'fog')}")
             hud_lines.append(f"  {fmt_weather('rain_severity', 'rain')}")
             hud_lines.append(f"  {fmt_weather('snow_severity', 'snow')}")
@@ -165,7 +157,7 @@ def main():
             hud_lines.append("WEATHER: No Data")
 
         # -------- Helper formatter --------
-        def fmt(orig, corr, show_conf=True):
+        def fmt_with_arrow(orig, corr, show_conf=True):
             if not orig:
                 return "N/A"
 
@@ -180,12 +172,15 @@ def main():
             else:
                 base = f"{o_label}"
 
-            if corr:
-                if show_conf and c_conf is not None:
-                    return f"{base} → {c_label} ({c_conf:.2f})"
-                else:
-                    return f"{base} → {c_label}"
-            return base
+            if not corr:
+                return base
+
+            if show_conf and c_conf is not None:
+                corrected = f"{c_label} ({c_conf:.2f})"
+            else:
+                corrected = f"{c_label}"
+
+            return f"{base} -> {corrected}"
 
         # -------- ODD Model --------
         pred = unified.get("prediction") or {}
@@ -193,34 +188,6 @@ def main():
         if pred:
             hud_lines.append("")
             hud_lines.append("=== ODD MODEL ===")
-
-            def fmt_with_arrow(orig, corr, show_conf=True):
-                if not orig:
-                    return "N/A"
-
-                o_label = orig.get("label", "N/A")
-                o_conf = orig.get("confidence")
-
-                c_label = corr.get("label") if corr else None
-                c_conf = corr.get("confidence") if corr else None
-
-                # Base (original)
-                if show_conf and o_conf is not None:
-                    base = f"{o_label} ({o_conf:.2f})"
-                else:
-                    base = f"{o_label}"
-
-                # If no corrected
-                if not corr:
-                    return base
-
-                # Corrected part
-                if show_conf and c_conf is not None:
-                    corrected = f"{c_label} ({c_conf:.2f})"
-                else:
-                    corrected = f"{c_label}"
-                
-                return f"{base} -> {corrected}"
 
             hud_lines.append(
                 f"TIME: {fmt_with_arrow(pred.get('time'), stage2.get('time_corrected'), False)}"
@@ -234,6 +201,12 @@ def main():
             hud_lines.append(
                 f"ROAD: {fmt_with_arrow(pred.get('road_condition_infer'), stage2.get('road_condition_corrected'))}"
             )
+
+            # -------- NEW: ANOMALY --------
+            if pred.get("anomalies"):
+                hud_lines.append(
+                    f"ANOMALY: {pred.get('anomalies').get('label')} ({pred.get('anomalies').get('confidence')})"
+                )
 
         else:
             hud_lines.append("ODD MODEL: No Data")
