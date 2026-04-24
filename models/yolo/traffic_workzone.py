@@ -68,7 +68,7 @@ class TrafficWorkzoneAnalyzer:
                 return idx
         return None
 
-    def analyze_image(self, image_path: Union[str, Path]) -> Dict[str, Any]:
+    def analyze_image(self, image_path: Union[str, Path], return_plot: bool = False) -> Dict[str, Any]:
         image_path = Path(image_path)
         if not image_path.exists():
             raise FileNotFoundError(f"image not found at {image_path}")
@@ -102,11 +102,16 @@ class TrafficWorkzoneAnalyzer:
         traffic_density = self._calculate_traffic_density(detections, image_area)
         is_workzone = self._determine_workzone_presence(detections, image_area)
 
-        return {
+        result = {
             'traffic_density': traffic_density,
             'work_zone': is_workzone,
             'raw_detections': detections
         }
+
+        if return_plot:
+            result['_plot_img'] = img_result.plot()
+
+        return result
 
     def _calculate_traffic_density(self, detections: List[Dict], image_area: float) -> Dict[str, float]:
         """
@@ -197,18 +202,24 @@ class TrafficWorkzoneAnalyzer:
 
         return True
 
-def process_traffic_workzone(input_dir, json_dir, model_path, thresholds_path=None):
+def process_traffic_workzone(input_dir, json_dir, model_path, thresholds_path=None, vis_dir=None):
     """
-    Evaluate all images in input_dir, save outputs in json_dir
+    Evaluate all images in input_dir, save outputs in json_dir.
+    If vis_dir is provided, also save bbox visualization images.
     """
     os.makedirs(json_dir, exist_ok=True)
+    if vis_dir is not None:
+        os.makedirs(vis_dir, exist_ok=True)
+
     analyzer = TrafficWorkzoneAnalyzer(model_path=model_path, thresholds_path=thresholds_path)
     
     image_extensions = ('.jpg', '.jpeg', '.png')
     image_paths = [p for p in Path(input_dir).iterdir() if p.suffix.lower() in image_extensions]
     
     for img_path in image_paths:
-        result = analyzer.analyze_image(str(img_path))
+        need_plot = vis_dir is not None
+        result = analyzer.analyze_image(str(img_path), return_plot=need_plot)
+
         output = {
             'car_density': result['traffic_density']['car'],
             'pedestrian_density': result['traffic_density']['pedestrian'],
@@ -218,6 +229,11 @@ def process_traffic_workzone(input_dir, json_dir, model_path, thresholds_path=No
         json_path = Path(json_dir) / (img_path.stem + '.json')
         with open(json_path, 'w') as f:
             json.dump(output, f, indent=2)
+
+        if need_plot and '_plot_img' in result:
+            import cv2
+            vis_path = Path(vis_dir) / (img_path.stem + '.jpg')
+            cv2.imwrite(str(vis_path), result['_plot_img'])
 
 # for local testing
 if __name__ == '__main__':

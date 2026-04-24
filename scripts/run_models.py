@@ -111,12 +111,14 @@ def run_pipeline():
     # ---------------------------------------------------------
     print("\n[5/5] Running YOLO Evaluation...")
     yolo_output_dir = os.path.join(OUTPUT_JSON, "yolo")
+    yolo_vis_dir = os.path.join(OUTPUT_JSON, "yolo_vis")
     
     process_traffic_workzone(
         input_dir=INPUT_IMAGES,
         json_dir=yolo_output_dir,
         model_path="models/yolo/yolo_traffic_workzone.pt",
-        thresholds_path="models/yolo/density_thresholds.json"
+        thresholds_path="models/yolo/density_thresholds.json",
+        vis_dir=yolo_vis_dir
     )
 
     # ---------------------------------------------------------

@@ -67,6 +67,7 @@ def main():
     print("========================================")
 
     idx = 0
+    show_bbox = False
 
     while True:
 
@@ -100,6 +101,15 @@ def main():
         if img.shape[0] > max_display_height:
             scale = max_display_height / img.shape[0]
             img = cv2.resize(img, (int(img.shape[1] * scale), int(img.shape[0] * scale)))
+
+        # -------- YOLO bbox toggle --------
+        if show_bbox:
+            bbox_path = os.path.join(JSON_ROOT, "yolo_vis", f"{basename}.jpg")
+            if os.path.exists(bbox_path):
+                bbox_img = cv2.imread(bbox_path)
+                if bbox_img is not None:
+                    bbox_img = cv2.resize(bbox_img, (img.shape[1], img.shape[0]))
+                    img = bbox_img
 
         # -------- Load Data --------
         merged_data = load_merged_data(basename)
@@ -242,6 +252,8 @@ def main():
             idx = (idx + 1) % len(image_paths)
         elif key in [ord('a'), 81]:
             idx = (idx - 1) % len(image_paths)
+        elif key == ord('b'):
+            show_bbox = not show_bbox
 
     cv2.destroyAllWindows()
 

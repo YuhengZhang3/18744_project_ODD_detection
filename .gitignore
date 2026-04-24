@@ -25,7 +25,7 @@ data_local/
 # generated outputs
 infer_outputs/
 output/
-outputs/
+outputs*/
 logs*
 analysis/
 
@@ -54,8 +54,7 @@ data/bdd100k*/
 data/roadwork*/
 data/pre_aug_yolo_labels/
 runs/
-source_images/
-source_images_old/
+source_images*/
 output_json/
 stage1_outputs*
 eval_guardrail_output/
