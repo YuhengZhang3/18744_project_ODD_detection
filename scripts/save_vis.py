@@ -11,6 +11,9 @@ JSON_ROOT = os.path.join(project_root, "outputs")
 
 MERGED_DIR = os.path.join(JSON_ROOT, "merged_json")
 GLARE_DIR = os.path.join(JSON_ROOT, "glare")
+OUTPUT_DIR = os.path.join(JSON_ROOT, "visualize_outputs")
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 def load_merged_data(basename):
@@ -63,22 +66,17 @@ def main():
         return
 
     print("========================================")
-    print("        PIPELINE VIEWER STARTED         ")
+    print("        PIPELINE EXPORTER STARTED       ")
     print("========================================")
 
-    idx = 0
-    show_bbox = False
+    for img_path in image_paths:
 
-    while True:
-
-        img_path = image_paths[idx]
         filename = os.path.basename(img_path)
         basename = os.path.splitext(filename)[0]
 
         img = cv2.imread(img_path)
 
         if img is None:
-            idx = (idx + 1) % len(image_paths)
             continue
 
         # -------- Glare Overlay --------
@@ -95,7 +93,8 @@ def main():
                 overlay[mask >= 128] = [0, 255, 255]
 
                 cv2.addWeighted(img, 0.7, overlay, 0.3, 0, img)
-                
+
+        # -------- Resize --------
         def resize_with_padding(img, target_size=(1280, 720)):
             target_w, target_h = target_size
             h, w = img.shape[:2]
@@ -115,7 +114,9 @@ def main():
 
         img = resize_with_padding(img, (1280, 720))
 
-        # -------- YOLO bbox toggle --------
+        # -------- YOLO bbox toggle (always off in exporter) --------
+        # (kept logic but no toggle loop)
+        show_bbox = False
         if show_bbox:
             bbox_path = os.path.join(JSON_ROOT, "yolo_vis", f"{basename}.jpg")
             if os.path.exists(bbox_path):
@@ -225,12 +226,10 @@ def main():
                 f"ROAD: {fmt_with_arrow(pred.get('road_condition_infer'), stage2.get('road_condition_corrected'))}"
             )
 
-            # -------- NEW: ANOMALY --------
             if pred.get("anomalies"):
                 hud_lines.append(
                     f"ANOMALY: {pred.get('anomalies').get('label')} ({pred.get('anomalies').get('confidence')})"
                 )
-
         else:
             hud_lines.append("ODD MODEL: No Data")
 
@@ -255,20 +254,10 @@ def main():
         # -------- Draw --------
         display_img = draw_side_panel(img, hud_lines)
 
-        cv2.imshow("Vision Pipeline Viewer", display_img)
+        save_path = os.path.join(OUTPUT_DIR, filename)
+        cv2.imwrite(save_path, display_img)
 
-        key = cv2.waitKey(0) & 0xFF
-
-        if key in [ord('q'), 27]:
-            break
-        elif key in [ord('d'), 83]:
-            idx = (idx + 1) % len(image_paths)
-        elif key in [ord('a'), 81]:
-            idx = (idx - 1) % len(image_paths)
-        elif key == ord('b'):
-            show_bbox = not show_bbox
-
-    cv2.destroyAllWindows()
+    print(f"Done. Saved to: {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

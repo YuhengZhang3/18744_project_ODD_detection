@@ -61,3 +61,4 @@ eval_guardrail_output/
 
 # large files
 *.tar.gz
+*.tgz
